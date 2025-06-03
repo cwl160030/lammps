@@ -1,0 +1,18 @@
+#!/bin/bash
+
+#make clean-all
+module purge
+module load git/2.31.4
+
+# gcc
+#module load gcc/13.2.0
+#module load mpich/gcc
+#module load binutils/2.43-gcc14.2.0
+
+# intel
+source /opt/intel/oneapi/setvars.sh
+module load intel/2021.2.0
+module load impi/2021.2.0
+
+make yes-molecule yes-extra-molecule yes-kspace yes-rigid yes-openmp yes-intel yes-reaxff
+make intel_cpu_intelmpi

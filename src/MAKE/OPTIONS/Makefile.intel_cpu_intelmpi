@@ -17,8 +17,10 @@ FMTFLAGS = 	-std=c++11
 DEPFLAGS =	-M
 
 LINK =		mpiicpc -std=c++11 -diag-disable=10441 -diag-disable=2196
-LINKFLAGS =	-qopenmp $(OPTFLAGS) -L$(MKLROOT)/lib/intel64/
-LIB =           -ltbbmalloc -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core
+# Added stdc++ dir to LINKFLAGS
+LINKFLAGS =	-qopenmp $(OPTFLAGS) -L$(MKLROOT)/lib/intel64/ -L/opt/intel/oneapi/compiler/2021.2.0/linux/lib/oclfpga/linux64/lib/dspba/linux64/
+# Added -lstdc++ to LIB
+LIB =           -ltbbmalloc -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lstdc++
 SIZE =		size
 
 ARCHIVE =	ar
