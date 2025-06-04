@@ -9,6 +9,10 @@
 
 #include <cstdio>
 #include <cstring>
+#include <sys/types.h>
+#include <sys.stat.h>
+#include <unistd.h>
+#include <errno.h>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -59,9 +63,7 @@ int FixQmhub::setmask()
 /* ---------------------------------------------------------------------- */
 
 void FixQmhub::setup()
-{
-  // To do: check qmhub installation
-   
+{ 
   // get positions, charges, QM atom types, and cell vectors
   
   int nlocal = atom->nlocal;
@@ -69,6 +71,10 @@ void FixQmhub::setup()
   double  *q = atom->q;
   if (q == nullptr) error->all(FLERR, "fix qmhub error: atoms do not have 'q' attribute. Ensure atom style allows charges.");
   int *type = atom->type;  
+
+  double *avec = domain->avec;
+  double *bvec = domain->bvec;
+  double *cvec = domain->cvec;
 
   int num_qm_local = 0;
   int num_mm_local = 0;
@@ -79,7 +85,7 @@ void FixQmhub::setup()
   
   double *qm_coord_local = nullptr;
   double *qm_chrgs_local = nullptr;
-  double *qm_types_local = nullptr;
+  int    *qm_types_local = nullptr;
   double *mm_coord_local = nullptr;
   double *mm_chrgs_local = nullptr;
   
@@ -111,7 +117,7 @@ void FixQmhub::setup()
 
   double *qm_coord = nullptr;
   double *qm_chrgs = nullptr; 
-  double *qm_types = nullptr; 
+  int    *qm_types = nullptr; 
   double *mm_coord = nullptr;
   double *mm_chrgs = nullptr;
 
@@ -182,7 +188,7 @@ void FixQmhub::setup()
 
   MPI_Gatherv(qm_coord_local, num_qm_local*3, MPI_DOUBLE, qm_coord, recv_qm_x, disp_qm_x, MPI_DOUBLE, 0, world);
   MPI_Gatherv(qm_chrgs_local, num_qm_local  , MPI_DOUBLE, qm_chrgs, recv_qm_q, disp_qm_q, MPI_DOUBLE, 0, world);
-  MPI_Gatherv(qm_types_local, num_qm_local  , MPI_DOUBLE, qm_types, recv_qm_t, disp_qm_t, MPI_DOUBLE, 0, world);
+  MPI_Gatherv(qm_types_local, num_qm_local  , MPI_INT   , qm_types, recv_qm_t, disp_qm_t, MPI_INT   , 0, world);
   MPI_Gatherv(mm_coord_local, num_mm_local*3, MPI_DOUBLE, mm_coord, recv_mm_x, disp_mm_x, MPI_DOUBLE, 0, world);
   MPI_Gatherv(mm_chrgs_local, num_mm_local  , MPI_DOUBLE, mm_chrgs, recv_mm_q, disp_mm_q, MPI_DOUBLE, 0, world);
   
@@ -208,28 +214,47 @@ void FixQmhub::setup()
     memory->destroy(disp_mm_q);
   }
 
-  // write to FIFO qmmm.inp
-
   if (comm->me == 0) {
-    //fifo
-    system("mkfifo qmmm.inp"); 
-    // will continue here!
+    // create FIFO qmmm.inp
+    if (access("qmmm.inp", F_OK) == -1) {
+      int ret = mkfifo("qmmm.inp", 0666);
+      if ((ret == -1) && (errno != EEXIST)) error->all(FLERR, "fix qmhub error: cannot create FIFO 'qmmm.inp'");
+    }
+
+    // write qmmm.inp in Amber style (already compatible with qmhub
+    // To do: confirm units are correct for output!
+
+    FILE *fp_qmmm_in = fopen("qmmm.inp", "w");
+    if (fp_qmmm_in == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.inp'");
+
+    fprintf(fp_qmmm_in, "%d %d %d %d %d\n", num_qm, num_mm, qm_r_chrg, qm_r_spin, is_pbc);
+    for (int i = 0; i < num_qm; i++) {
+      fprintf(fp_qmmm_in, "%.15f %.15f %.15f %.15f %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], qm_types[i]);
+    }
+    for (int i = 0; i < num_mm; i++) {
+      fprintf(fp_qmmm_in, "%.15f %.15f %.15f %.15f\n", mm_coord[3*i], mm_coord[3*i+1], mm_coord[3*i+2], mm_chrgs[i]);
+    }
+    fprintf(fp_qmmm_in, "%.15f %.15f %.15f\n", avec[0], avec[1], avec[2]);
+    fprintf(fp_qmmm_in, "%.15f %.15f %.15f\n", bvec[0], bvec[1], bvec[2]);
+    fprintf(fp_qmmm_in, "%.15f %.15f %.15f\n", cvec[0], cvec[1], cvec[2]);
+    
+    fclose(fp_qmmm_in);
+
     memory->destroy(qm_coord);
     memory->destroy(qm_chrgs);
     memory->destroy(qm_types);
     memory->destroy(mm_coord);
     memory->destroy(mm_chrgs);
+
+    // system call to qmhub
+    system("qmhub qmhub.ini --fifo qmmm.inp --driver sander&");
   }
-  // system call to qmhub 
 }
 
 /* ---------------------------------------------------------------------- */
 
 void FixQmhub::post_integrate()
 {
-    // get positions and charges
-    // write to FIFO qmmm.inp
-    // system call to qmhub
 }
 
 /* ---------------------------------------------------------------------- */
