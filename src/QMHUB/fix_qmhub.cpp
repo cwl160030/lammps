@@ -129,7 +129,8 @@ void FixQmhub::post_integrate()
     memory->destroy(mm_chrgs);
 
     // system call to qmhub
-    system("qmhub qmhub.ini --fifo qmmm.inp --driver sander&");
+    int callret = system("qmhub qmhub.ini --fifo qmmm.inp --driver sander&");
+    if (callret != 0) error->all(FLERR, "fix qmhub error: qmhub execution failed");
   }
 }
 
@@ -138,35 +139,116 @@ void FixQmhub::post_integrate()
 void FixQmhub::post_force()
 {
   // read gradients from FIFO qmmm.out
-  double  scf_energy;
-  double *scf_gradients = nullptr
+  double *qm_grad = nullptr;
+  double *mm_grad = nullptr;
   if (comm->me == 0) {
-    memory->create(scf_gradients, num_qm+num_mm, "fix/qmhub:scf_gradients");
+    memory->create(qm_grad, 3*num_qm, "fix/qmhub:qm_grad");
+    memory->create(mm_grad, 3*num_mm, "fix/qmhub:mm_grad");
 
     FILE *fp_qmmm_out = fopen("qmmm.out", "r");
     if (fp_qmmm_out == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.out'");
 
-    fscanf(fp_qmmm_out, "%lf", &scf_energy); // SCF energy
-    for (int i = 0; i < (num_qm+num_mm); i++) {
-      fscanf(fp_qmmm_out, "%lf %lf %lf", &scf_gradients[3*i], &scf_gradients[3*i+1], &scf_gradients[3*i+2]);
+    fscanf(fp_qmmm_out, "%lf", &E_SCF);
+    for (int i = 0; i < num_qm; i++) {
+      fscanf(fp_qmmm_out, "%lf %lf %lf", &qm_grad[3*i], &qm_grad[3*i+1], &qm_grad[3*i+2]);
+    }
+    for (int i = 0; i < num_mm; i++) {
+      fscanf(fp_qmmm_out, "%lf %lf %lf", &mm_grad[3*i], &mm_grad[3*i+1], &mm_grad[3*i+2]);
     }
 
     fclose(fp_qmmm_out);
   }
 
-  // send global gradients to local (working on this!)
+  // send global gradients to local
   int nlocal = atom->nlocal;
-  double *scf_gradients_local = nullptr;
-  memory->create(scf_gradients_local, 3*nlocal, "fix/qmmm:scf_gradients_local");
+  double *qm_grad_local = nullptr;
+  double *mm_grad_local = nullptr;
+  
+  int num_qm_local = 0;
+  int num_mm_local = 0;
+  for (int i = 0; i < nlocal; i++) {
+    if (atom->mask[i] & groupbit_qm) num_qm_local++;
+    if (atom->mask[i] & groupbit_mm) num_mm_local++;
+  }
 
-  MPI_Scatterv(scf_gradients, , , MPI_DOUBLE, , 3*nlocal, MPI_DOUBLE, 0, world);
+  memory->create(qm_grad_local, 3*num_qm_local, "fix/qmmm:qm_grad_local");
+  memory->create(mm_grad_local, 3*num_mm_local, "fix/qmmm:mm_grad_local");  
 
-  // add forces 
+  int nprocs;
+  MPI_Comm_Size(world, &nprocs);
+
+  int *count_qm_all = nullptr;
+  int *count_mm_all = nullptr;
 
   if (comm->me == 0) {
-    memory->destroy(scf_gradients);
+    memory->create(count_qm_all, nprocs, "fix/qmhub:count_qm_all");
+    memory->create(count_mm_all, nprocs, "fix/qmhub:count_mm_all");
   }
-  memory->destroy(scf_gradients_local);
+
+  MPI_Gather(&num_qm_local, 1, MPI_INT, count_qm_all, 1, MPI_INT, 0, world);
+  MPI_Gather(&num_mm_local, 1, MPI_INT, count_mm_all, 1, MPI_INT, 0, world);
+
+  int *send_qm = nullptr;
+  int *send_mm = nullptr;
+  int *disp_qm = nullptr;
+  int *disp_mm = nullptr;
+
+  if (comm->me == 0) {
+    memory->create(send_qm, nprocs, "fix/qmhub:send_qm");
+    memory->create(send_mm, nprocs, "fix/qmhub:send_mm");
+    memory->create(disp_qm, nprocs, "fix/qmhub:disp_qm");
+    memory->create(disp_mm, nprocs, "fix/qmhub:disp_mm");
+
+    for (int i = 0; i < nprocs; i++) {
+      send_qm[i] = 3*count_qm_all[i];
+      send_mm[i] = 3*count_mm_all[i];
+    }
+    
+    disp_qm[0] = 0;
+    disp_mm[0] = 0;
+
+    for (int i = 1; i < nprocs; i++) {
+      disp_qm[i] = disp_qm[i-1] + send_qm[i-1];
+      disp_mm[i] = disp_mm[i-1] + send_mm[i-1];
+    }
+  }
+
+  MPI_Scatterv(qm_grad, send_qm, disp_qm, MPI_DOUBLE, qm_grad_local, 3*num_qm_local, MPI_DOUBLE, 0, world);
+  MPI_Scatterv(mm_grad, send_mm, disp_mm, MPI_DOUBLE, mm_grad_local, 3*num_mm_local, MPI_DOUBLE, 0, world);
+
+  // convert to forces (Ha/Bohr -> -kcal/mol/Angstrom) and add
+  const double HABOHR_KCALMOLA = (627.5096080305927) / (0.529177210544);
+  int count_qm = 0;
+  int count_mm = 0;
+  for (int i = 0; i < nlocal; i++) {
+    if (atom->mask[i] & groupbit_qm) {
+      for (int dim = 0; dim < 3; dim++) {
+        atom->f[i][dim] -= HABOHR_KCALMOLA * qm_grad_local[3*count_qm+dim];
+      }
+      count_qm++;
+    }
+    if (atom->mask[i] & groupbit_mm) {
+      for (int dim = 0; dim < 3; dim++) {
+        atom->f[i][dim] -= HABOHR_KCALMOLA * mm_grad_local[3*count_qm+dim];
+      }
+      count_mm++;
+    }
+  }
+
+  if (comm->me == 0) {
+    memory->destroy(qm_grad);
+    memory->destroy(mm_grad);
+
+    memory->destroy(count_qm_all);
+    memory->destroy(count_mm_all);
+
+    memory->destroy(send_qm);
+    memory->destroy(send_mm);
+    memory->destroy(disp_qm);
+    memory->destroy(disp_mm);
+  }
+  memory->destroy(qm_grad_local);
+  memory->destroy(mm_grad_local);
 }
 
 /* ---------------------------------------------------------------------- */

@@ -37,6 +37,8 @@ class FixQmhub : public Fix {
 
   int groupbit_qm;			// Groupbit for region 'QM'
   int groupbit_mm;			// Groupbit for region 'MM'
+
+  double E_SCF;				// SCF Energy from QM package (Hartree)
 };
 
 } // namespace LAMMPS_NS
