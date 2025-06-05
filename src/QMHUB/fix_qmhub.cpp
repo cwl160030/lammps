@@ -25,7 +25,7 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) :
 {
   // fix ID all qmhub qm_r_chrg qm_r_spin
   if (narg < 5) utils::missing_cmd_args(FLERR, "fix qmhub", error);
-  if (arg[1] != "all") error->all(FLERR, "fix qmhub error: group-ID must be 'all'");
+  if (strcmp(arg[1], "all") != 0) error->all(FLERR, "fix qmhub error: group-ID must be 'all'");
   qm_r_chrg = utils::inumeric(FLERR, arg[3], false, lmp);
   qm_r_spin = utils::inumeric(FLERR, arg[4], false, lmp);
 
@@ -229,7 +229,7 @@ void FixQmhub::post_force()
     }
     if (atom->mask[i] & groupbit_mm) {
       for (int dim = 0; dim < 3; dim++) {
-        atom->f[i][dim] -= HABOHR_KCALMOLA * mm_grad_local[3*count_qm+dim];
+        atom->f[i][dim] -= HABOHR_KCALMOLA * mm_grad_local[3*count_mm+dim];
       }
       count_mm++;
     }
