@@ -9,8 +9,6 @@ FixStyle(qmhub,FixQmhub);
 
 #include "fix.h"
 
-#include <cstring>
-
 namespace LAMMPS_NS {
 
 class FixQmhub : public Fix {

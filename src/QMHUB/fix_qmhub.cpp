@@ -6,6 +6,7 @@
 #include "error.h"
 #include "group.h"
 #include "memory.h"
+#include "update.h"
 
 #include <cstdio>
 #include <cstring>
@@ -22,7 +23,7 @@ using namespace FixConst;
 FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) : 
     Fix(lmp, narg, arg)
 {
-  // fix ID all qmhub qm_q qm_spin
+  // fix ID all qmhub qm_r_chrg qm_r_spin
   if (narg < 5) utils::missing_cmd_args(FLERR, "fix qmhub", error);
   if (arg[1] != "all") error->all(FLERR, "fix qmhub error: group-ID must be 'all'");
   qm_r_chrg = utils::inumeric(FLERR, arg[3], false, lmp);
@@ -64,6 +65,9 @@ int FixQmhub::setmask()
 
 void FixQmhub::setup()
 { 
+  // Enforce units real
+  if (strcmp(update->style, "real") != 0) error->all(FLERR, "fix qmhub error: units must be 'real'");
+
   // get positions, charges, QM atom types, and cell vectors
   
   int nlocal = atom->nlocal;
@@ -221,24 +225,24 @@ void FixQmhub::setup()
       if ((ret == -1) && (errno != EEXIST)) error->all(FLERR, "fix qmhub error: cannot create FIFO 'qmmm.inp'");
     }
 
-    // write qmmm.inp in Amber style (already compatible with qmhub
-    // To do: confirm units are correct for output!
+    // write qmmm.inp in Amber style (already compatible with qmhub)
+    // x in Angstrom, q in elementary charges
 
-    FILE *fp_qmmm_in = fopen("qmmm.inp", "w");
-    if (fp_qmmm_in == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.inp'");
+    FILE *fp_qmmm_inp = fopen("qmmm.inp", "w");
+    if (fp_qmmm_inp == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.inp'");
 
-    fprintf(fp_qmmm_in, "%d %d %d %d %d\n", num_qm, num_mm, qm_r_chrg, qm_r_spin, is_pbc);
+    fprintf(fp_qmmm_inp, "%d %d %d %d %d\n", num_qm, num_mm, qm_r_chrg, qm_r_spin, is_pbc);
     for (int i = 0; i < num_qm; i++) {
-      fprintf(fp_qmmm_in, "%.15f %.15f %.15f %.15f %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], qm_types[i]);
+      fprintf(fp_qmmm_inp, "%.15f %.15f %.15f %.15f %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], qm_types[i]);
     }
     for (int i = 0; i < num_mm; i++) {
-      fprintf(fp_qmmm_in, "%.15f %.15f %.15f %.15f\n", mm_coord[3*i], mm_coord[3*i+1], mm_coord[3*i+2], mm_chrgs[i]);
+      fprintf(fp_qmmm_inp, "%.15f %.15f %.15f %.15f\n", mm_coord[3*i], mm_coord[3*i+1], mm_coord[3*i+2], mm_chrgs[i]);
     }
-    fprintf(fp_qmmm_in, "%.15f %.15f %.15f\n", avec[0], avec[1], avec[2]);
-    fprintf(fp_qmmm_in, "%.15f %.15f %.15f\n", bvec[0], bvec[1], bvec[2]);
-    fprintf(fp_qmmm_in, "%.15f %.15f %.15f\n", cvec[0], cvec[1], cvec[2]);
+    fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", avec[0], avec[1], avec[2]);
+    fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", bvec[0], bvec[1], bvec[2]);
+    fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", cvec[0], cvec[1], cvec[2]);
     
-    fclose(fp_qmmm_in);
+    fclose(fp_qmmm_inp);
 
     memory->destroy(qm_coord);
     memory->destroy(qm_chrgs);
@@ -255,8 +259,8 @@ void FixQmhub::setup()
 
 void FixQmhub::post_integrate()
 {
-  // get positions, charges, QM atom types, and cell vectors
-  
+  // get positions, charges, QM atom types, and cell vectors 
+ 
   int nlocal = atom->nlocal;
   double **x = atom->x;
   double  *q = atom->q;
@@ -392,24 +396,21 @@ void FixQmhub::post_integrate()
   }
 
   if (comm->me == 0) {
-    // write qmmm.inp in Amber style (already compatible with qmhub
-    // To do: confirm units are correct for output!
+    FILE *fp_qmmm_inp = fopen("qmmm.inp", "w");
+    if (fp_qmmm_inp == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.inp'");
 
-    FILE *fp_qmmm_in = fopen("qmmm.inp", "w");
-    if (fp_qmmm_in == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.inp'");
-
-    fprintf(fp_qmmm_in, "%d %d %d %d %d\n", num_qm, num_mm, qm_r_chrg, qm_r_spin, is_pbc);
+    fprintf(fp_qmmm_inp, "%d %d %d %d %d\n", num_qm, num_mm, qm_r_chrg, qm_r_spin, is_pbc);
     for (int i = 0; i < num_qm; i++) {
-      fprintf(fp_qmmm_in, "%.15f %.15f %.15f %.15f %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], qm_types[i]);
+      fprintf(fp_qmmm_inp, "%.15f %.15f %.15f %.15f %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], qm_types[i]);
     }
     for (int i = 0; i < num_mm; i++) {
-      fprintf(fp_qmmm_in, "%.15f %.15f %.15f %.15f\n", mm_coord[3*i], mm_coord[3*i+1], mm_coord[3*i+2], mm_chrgs[i]);
+      fprintf(fp_qmmm_inp, "%.15f %.15f %.15f %.15f\n", mm_coord[3*i], mm_coord[3*i+1], mm_coord[3*i+2], mm_chrgs[i]);
     }
-    fprintf(fp_qmmm_in, "%.15f %.15f %.15f\n", avec[0], avec[1], avec[2]);
-    fprintf(fp_qmmm_in, "%.15f %.15f %.15f\n", bvec[0], bvec[1], bvec[2]);
-    fprintf(fp_qmmm_in, "%.15f %.15f %.15f\n", cvec[0], cvec[1], cvec[2]);
+    fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", avec[0], avec[1], avec[2]);
+    fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", bvec[0], bvec[1], bvec[2]);
+    fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", cvec[0], cvec[1], cvec[2]);
     
-    fclose(fp_qmmm_in);
+    fclose(fp_qmmm_inp);
 
     memory->destroy(qm_coord);
     memory->destroy(qm_chrgs);
@@ -427,6 +428,33 @@ void FixQmhub::post_integrate()
 void FixQmhub::post_force()
 {
   // read gradients from FIFO qmmm.out
-  // convert to forces with correct units
-  // add forces
+  double  scf_energy;
+  double *scf_gradients = nullptr
+  if (comm->me == 0) {
+    memory->create(scf_gradients, num_qm+num_mm, "fix/qmhub:scf_gradients");
+
+    FILE *fp_qmmm_out = fopen("qmmm.out", "r");
+    if (fp_qmmm_out == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.out'");
+
+    fscanf(fp_qmmm_out, "%lf", &scf_energy); // SCF energy
+    for (int i = 0; i < (num_qm+num_mm); i++) {
+      fscanf(fp_qmmm_out, "%lf %lf %lf", scf_gradients[3*i], scf_gradients[3*i+1], scf_gradients[3*i+2]);
+    }
+
+    fclose(fp_qmmm_out);
+  }
+
+  // send global gradients to local (working on this!)
+  int nlocal = atom->nlocal;
+  double *scf_gradients_local = nullptr;
+  memory->create(scf_gradients_local, 3*nlocal, "fix/qmmm:scf_gradients_local");
+
+  MPI_Scatterv(scf_gradients, , , MPI_DOUBLE, , 3*nlocal, MPI_DOUBLE, 0, world);
+
+  // add forces 
+
+  if (comm->me == 0) {
+    memory->destroy(scf_gradients);
+  }
+  memory->destroy(scf_gradients_local);
 }
