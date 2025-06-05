@@ -17,10 +17,10 @@ class FixQmhub : public Fix {
   ~FixQmhub() override;
   int setmask() override;
   
-  void setup() override;		// send positions and charges to QMHub
+  void setup(int) override;		// send positions and charges to QMHub
   void post_integrate() override;	//
 
-  void post_force() override;		// receive forces from QMHub
+  void post_force(int) override;	// receive forces from QMHub
 
   void get_lmp_data(double *qm_coord,   // get positions, charges, and QM types
                     double *qm_chrgs, 

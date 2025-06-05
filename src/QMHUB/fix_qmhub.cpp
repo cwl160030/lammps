@@ -63,10 +63,10 @@ int FixQmhub::setmask()
 
 /* ---------------------------------------------------------------------- */
 
-void FixQmhub::setup()
+void FixQmhub::setup(int vflag)
 { 
   // Enforce units real
-  if (strcmp(update->style, "real") != 0) error->all(FLERR, "fix qmhub error: units must be 'real'");
+  if (strcmp(update->unit_style, "real") != 0) error->all(FLERR, "fix qmhub error: units must be 'real'");
 
   // open FIFO qmmm.inp
   if (comm->me == 0) {
@@ -99,7 +99,7 @@ void FixQmhub::post_integrate()
     memory->create(mm_chrgs, num_mm  , "fix/qmhub:mm_chrgs");
   }
 
-  get_lammps_data(qm_coord, qm_chrgs, qm_types, mm_coord, mm_chrgs);  
+  get_lmp_data(qm_coord, qm_chrgs, qm_types, mm_coord, mm_chrgs);  
 
   double *avec = domain->avec;
   double *bvec = domain->bvec;
@@ -136,7 +136,7 @@ void FixQmhub::post_integrate()
 
 /* ---------------------------------------------------------------------- */
 
-void FixQmhub::post_force()
+void FixQmhub::post_force(int vflag)
 {
   // read gradients from FIFO qmmm.out
   double *qm_grad = nullptr;
@@ -175,7 +175,7 @@ void FixQmhub::post_force()
   memory->create(mm_grad_local, 3*num_mm_local, "fix/qmmm:mm_grad_local");  
 
   int nprocs;
-  MPI_Comm_Size(world, &nprocs);
+  MPI_Comm_size(world, &nprocs);
 
   int *count_qm_all = nullptr;
   int *count_mm_all = nullptr;
@@ -301,7 +301,7 @@ void FixQmhub::get_lmp_data(double *qm_coord, double *qm_chrgs, int *qm_types, d
   }
 
   int nprocs;
-  MPI_Comm_Size(world, &nprocs);
+  MPI_Comm_size(world, &nprocs);
 
   int *count_qm_all = nullptr;
   int *count_mm_all = nullptr;
