@@ -22,6 +22,12 @@ class FixQmhub : public Fix {
 
   void post_force() override;		// receive forces from QMHub
 
+  void get_lmp_data(double *qm_coord,   // get positions, charges, and QM types
+                    double *qm_chrgs, 
+                    int    *qm_types, 
+                    double *mm_coord, 
+                    double *mm_chrgs);
+
  protected:
   int num_qm;				// Number of QM atoms
   int num_mm;				// Number of MM atoms
