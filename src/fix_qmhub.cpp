@@ -28,7 +28,6 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) :
   if (strcmp(arg[1], "all") != 0) error->all(FLERR, "fix qmhub error: group-ID must be 'all'");
   qm_r_chrg = utils::inumeric(FLERR, arg[3], false, lmp);
   qm_r_spin = utils::inumeric(FLERR, arg[4], false, lmp);
-  if (qm_r_spin < 1) error->all(FLERR, "fix qmhub error: Illegal qm_r_spin value: {}", qm_r_spin);
 
   if ((domain->xperiodic == 0) && (domain->yperiodic == 0) && (domain->zperiodic == 0)) is_pbc = 0;
   else if ((domain->xperiodic == 1) && (domain->yperiodic == 1) && (domain->zperiodic == 1)) is_pbc = 1;
@@ -69,6 +68,9 @@ void FixQmhub::setup(int vflag)
   // Enforce units real
   if (strcmp(update->unit_style, "real") != 0) error->all(FLERR, "fix qmhub error: units must be 'real'");
 
+  // debug
+  if ((comm->me==0) && screen) fprintf(screen, "*** Opening FIFO ***\n");
+  
   // open FIFO qmmm.inp
   if (comm->me == 0) {
     if (access("qmmm.inp", F_OK) == -1) {
@@ -77,6 +79,9 @@ void FixQmhub::setup(int vflag)
     }
   }
 
+  // debug
+  if ((comm->me==0) && screen) fprintf(screen, "*** Opened FIFO ***\n");
+  
   post_integrate();
 }
 
@@ -106,10 +111,16 @@ void FixQmhub::post_integrate()
   double *bvec = domain->bvec;
   double *cvec = domain->cvec;
 
+  // debug
+  if ((comm->me==0) && screen) fprintf(screen, "*** Got LAMMPS data ***\n");
+
   if (comm->me == 0) {
-    FILE *fp_qmmm_inp = fopen("qmmm.inp", "w");
+    FILE *fp_qmmm_inp = fopen("qmmm.inp", "w+");
     if (fp_qmmm_inp == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.inp'");
 
+    // debug
+    if ((comm->me==0) && screen) fprintf(screen, "*** Printing to qmmm.inp ***\n");
+    
     fprintf(fp_qmmm_inp, "%d %d %d %d %d\n", num_qm, num_mm, qm_r_chrg, qm_r_spin, is_pbc);
     for (int i = 0; i < num_qm; i++) {
       fprintf(fp_qmmm_inp, "%.15f %.15f %.15f %.15f %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], qm_types[i]);
@@ -120,7 +131,8 @@ void FixQmhub::post_integrate()
     fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", avec[0], avec[1], avec[2]);
     fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", bvec[0], bvec[1], bvec[2]);
     fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", cvec[0], cvec[1], cvec[2]);
-    
+   
+    fflush(fp_qmmm_inp); 
     fclose(fp_qmmm_inp);
 
     memory->destroy(qm_coord);
@@ -129,8 +141,12 @@ void FixQmhub::post_integrate()
     memory->destroy(mm_coord);
     memory->destroy(mm_chrgs);
 
+    // debug
+    if ((comm->me==0) && screen) fprintf(screen, "*** Calling QMHub ***\n");
+
     // system call to qmhub
-    int callret = system("qmhub qmhub.ini --fifo qmmm.inp --driver sander&");
+    //int callret = system("qmhub qmhub.ini --fifo qmmm.inp --driver sander&");
+    int callret = system("qmhub -f qmmm.inp -d sander -c . qmhub.ini&");
     if (callret != 0) error->all(FLERR, "fix qmhub error: qmhub execution failed");
   }
 }

@@ -14,5 +14,5 @@ source /opt/intel/oneapi/setvars.sh
 module load intel/2021.2.0
 module load impi/2021.2.0
 
-make yes-molecule yes-extra-molecule yes-kspace yes-rigid yes-openmp yes-intel yes-reaxff
-make intel_cpu_intelmpi
+#make yes-molecule yes-extra-molecule yes-kspace yes-rigid yes-openmp yes-intel yes-reaxff
+make -j $(nproc) intel_cpu_intelmpi
