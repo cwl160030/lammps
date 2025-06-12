@@ -85,7 +85,6 @@ int FixQmhub::setmask()
   int mask = 0;
   mask |= POST_FORCE;
   mask |= POST_INTEGRATE;
-  mask |= END_OF_STEP;
   return mask;
 }
 
@@ -102,7 +101,11 @@ void FixQmhub::setup(int vflag)
     fprintf(screen, " QMHub: A universal QM/MM interface\n");
     fprintf(screen, " https://github.com/panxl/qmhub\n\n");
   }
-  
+
+  // make qmhub directory for QM engine calculations
+  int mkret = mkdir("qmhub", 0777);  
+  if ((mkret != 0) && (errno != EEXIST)) error->all(FLERR, "fix qmhub error: could not create or access directory ./qmhub/");
+
   post_integrate();
 }
 
@@ -129,7 +132,7 @@ void FixQmhub::post_integrate()
   get_lmp_data(qm_coord, qm_chrgs, qm_types, mm_coord, mm_chrgs);  
 
   if (comm->me == 0) {   
-    FILE *fp_qmmm_inp = fopen("qmmm.inp", "w");
+    FILE *fp_qmmm_inp = fopen("./qmhub/qmmm.inp", "w");
     if (fp_qmmm_inp == nullptr) error->all(FLERR, "fix qmhub error: cannot open 'qmmm.inp'");
     
     fprintf(fp_qmmm_inp, "%d %d %d %d %d\n", num_qm, num_mm, qm_r_chrg, qm_r_spin, is_pbc);
@@ -152,8 +155,8 @@ void FixQmhub::post_integrate()
     memory->destroy(mm_coord);
     memory->destroy(mm_chrgs);
 
-    // make qmhub directory and system call to qmhub
-    int callret = system("qmhub qmhub.ini --text qmmm.inp --driver sander");
+    // system call to qmhub
+    int callret = system("qmhub qmhub.ini --text ./qmhub/qmmm.inp --driver sander");
     if (callret != 0) error->all(FLERR, "fix qmhub error: qmhub execution failed");
   }
 }
@@ -169,8 +172,8 @@ void FixQmhub::post_force(int vflag)
     memory->create(qm_grad, 3*num_qm, "fix/qmhub:qm_grad");
     memory->create(mm_grad, 3*num_mm, "fix/qmhub:mm_grad");
 
-    FILE *fp_qmmm_out = fopen("qmmm.out", "r");
-    if (fp_qmmm_out == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.out'");
+    FILE *fp_qmmm_out = fopen("./qmhub/qmmm.out", "r");
+    if (fp_qmmm_out == nullptr) error->all(FLERR, "fix qmhub error: cannot open 'qmmm.out'");
 
     fscanf(fp_qmmm_out, "%lf", &E_SCF);
     for (int i = 0; i < num_qm; i++) {
@@ -273,15 +276,6 @@ void FixQmhub::post_force(int vflag)
   }
   memory->destroy(qm_grad_local);
   memory->destroy(mm_grad_local);
-}
-
-/* ---------------------------------------------------------------------- */
-
-void FixQmhub::end_of_step()
-{
-  if ((comm->me == 0) && (screen)) {
-    fprintf(screen, "   ESCF (Ha) = %f\n", E_SCF);
-  }
 }
 
 /* ---------------------------------------------------------------------- */

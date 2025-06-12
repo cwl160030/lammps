@@ -1,6 +1,7 @@
 #include "fix_qmhub.h"
 
 #include "atom.h"
+#include "citeme.h"
 #include "comm.h"
 #include "domain.h"
 #include "error.h"
@@ -18,21 +19,39 @@
 using namespace LAMMPS_NS;
 using namespace FixConst;
 
+static const char cite_fix_qmhub[] =
+  "fix qmhub command: https://doi.org/10.1063/5.0038120\n\n"
+  "@Article{Pan2021,\n"
+  " author = {Xiaoliang Pan, Kwangho Nam, Evgeny Epifanovsky, Andrew C. Simmonett, Edina Rosta, and Yihan Shao},\n"
+  " title = {A simplified charge projection scheme for long-range electrostatics in ab initio QM/MM calculations},\n"
+  " journal = {J. Chem. Phys.},\n"
+  " year =    2021,\n"
+  " volume =  154,\n"
+  " number =  2, \n"
+  " pages =   024115\n"
+  "}\n\n";
+
 /* ---------------------------------------------------------------------- */
 
 FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) : 
     Fix(lmp, narg, arg)
 {
-  // fix ID all qmhub qm_r_chrg qm_r_spin
-  if (narg < 5) utils::missing_cmd_args(FLERR, "fix qmhub", error);
+  // fix ID all qmhub qm_r_chrg qm_r_spin atomic_number1 atomic_number2 ...
+  int ntypes = atom->ntypes;
+  if (narg < 5+ntypes) utils::missing_cmd_args(FLERR, "fix qmhub", error);
   if (strcmp(arg[1], "all") != 0) error->all(FLERR, "fix qmhub error: group-ID must be 'all'");
   qm_r_chrg = utils::inumeric(FLERR, arg[3], false, lmp);
   qm_r_spin = utils::inumeric(FLERR, arg[4], false, lmp);
-  if (qm_r_spin < 1) error->all(FLERR, "fix qmhub error: Illegal qm_r_spin value: {}", qm_r_spin);
 
   if ((domain->xperiodic == 0) && (domain->yperiodic == 0) && (domain->zperiodic == 0)) is_pbc = 0;
   else if ((domain->xperiodic == 1) && (domain->yperiodic == 1) && (domain->zperiodic == 1)) is_pbc = 1;
   else error->all(FLERR, "fix qmhub error: cell must either be periodic in all directions or not periodic in all directions");
+
+  atomic_numbers = nullptr;
+  memory->create(atomic_numbers, ntypes, "fix/qmhub:atomic_numbers");
+  for (int i = 0; i < ntypes; i++) {
+    atomic_numbers[i] = utils::inumeric(FLERR, arg[5+i], false, lmp);
+  }
 
   int igroup_qm = group->find("QM");
   if (igroup_qm == -1) error->all(FLERR, "fix qmhub error: group 'QM' not defined");
@@ -49,7 +68,14 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) :
 
 FixQmhub::~FixQmhub()
 {
-  // Empty destructor
+  memory->destroy(atomic_numbers);
+}
+
+/* ---------------------------------------------------------------------- */
+
+void FixQmhub::post_constructor()
+{
+  if (lmp->citeme) lmp->citeme->add(cite_fix_qmhub);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -59,6 +85,7 @@ int FixQmhub::setmask()
   int mask = 0;
   mask |= POST_FORCE;
   mask |= POST_INTEGRATE;
+  mask |= END_OF_STEP;
   return mask;
 }
 
@@ -69,13 +96,16 @@ void FixQmhub::setup(int vflag)
   // Enforce units real
   if (strcmp(update->unit_style, "real") != 0) error->all(FLERR, "fix qmhub error: units must be 'real'");
 
-  // open FIFO qmmm.inp
-  if (comm->me == 0) {
-    if (access("qmmm.inp", F_OK) == -1) {
-      int ret = mkfifo("qmmm.inp", 0666);
-      if ((ret == -1) && (errno != EEXIST)) error->all(FLERR, "fix qmhub error: cannot create FIFO 'qmmm.inp'");
-    }
+  if ((comm->me==0) && screen) {
+    fprintf(screen, "\n>>> fix qmhub: BEGIN QM/MM CALCULATION <<<\n");
+    fprintf(screen, " Xiaoliang Pan and Yihan Shao\n");
+    fprintf(screen, " QMHub: A universal QM/MM interface\n");
+    fprintf(screen, " https://github.com/panxl/qmhub\n\n");
   }
+
+  // make qmhub directory for QM engine calculations
+  int mkret = mkdir("qmhub", 0666);  
+  if ((mkret != 0) && (errno != EEXIST)) error->all(FLERR, "fix qmhub error: could not create or access directory ./qmhub/");
 
   post_integrate();
 }
@@ -102,25 +132,22 @@ void FixQmhub::post_integrate()
 
   get_lmp_data(qm_coord, qm_chrgs, qm_types, mm_coord, mm_chrgs);  
 
-  double *avec = domain->avec;
-  double *bvec = domain->bvec;
-  double *cvec = domain->cvec;
-
-  if (comm->me == 0) {
+  if (comm->me == 0) {   
     FILE *fp_qmmm_inp = fopen("qmmm.inp", "w");
-    if (fp_qmmm_inp == nullptr) error->all(FLERR, "fix qmhub error: cannot open FIFO 'qmmm.inp'");
-
+    if (fp_qmmm_inp == nullptr) error->all(FLERR, "fix qmhub error: cannot open 'qmmm.inp'");
+    
     fprintf(fp_qmmm_inp, "%d %d %d %d %d\n", num_qm, num_mm, qm_r_chrg, qm_r_spin, is_pbc);
     for (int i = 0; i < num_qm; i++) {
-      fprintf(fp_qmmm_inp, "%.15f %.15f %.15f %.15f %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], qm_types[i]);
+      fprintf(fp_qmmm_inp, "% .15E % .15E % .15E % .15E %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], atomic_numbers[qm_types[i]-1]);
     }
     for (int i = 0; i < num_mm; i++) {
-      fprintf(fp_qmmm_inp, "%.15f %.15f %.15f %.15f\n", mm_coord[3*i], mm_coord[3*i+1], mm_coord[3*i+2], mm_chrgs[i]);
+      fprintf(fp_qmmm_inp, "% .15E % .15E % .15E % .15E\n", mm_coord[3*i], mm_coord[3*i+1], mm_coord[3*i+2], mm_chrgs[i]);
     }
-    fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", avec[0], avec[1], avec[2]);
-    fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", bvec[0], bvec[1], bvec[2]);
-    fprintf(fp_qmmm_inp, "%.15f %.15f %.15f\n", cvec[0], cvec[1], cvec[2]);
-    
+    fprintf(fp_qmmm_inp, "% .15E % .15E % .15E\n", domain->h[0], 0.0         , 0.0         );
+    fprintf(fp_qmmm_inp, "% .15E % .15E % .15E\n", domain->h[5], domain->h[1], 0.0         );
+    fprintf(fp_qmmm_inp, "% .15E % .15E % .15E\n", domain->h[4], domain->h[3], domain->h[2]);
+   
+    fflush(fp_qmmm_inp); 
     fclose(fp_qmmm_inp);
 
     memory->destroy(qm_coord);
@@ -130,7 +157,7 @@ void FixQmhub::post_integrate()
     memory->destroy(mm_chrgs);
 
     // system call to qmhub
-    int callret = system("qmhub qmhub.ini --fifo qmmm.inp --driver sander&");
+    int callret = system("qmhub qmhub.ini --text qmmm.inp --cwd qmhub/ --driver sander");
     if (callret != 0) error->all(FLERR, "fix qmhub error: qmhub execution failed");
   }
 }
@@ -139,7 +166,7 @@ void FixQmhub::post_integrate()
 
 void FixQmhub::post_force(int vflag)
 {
-  // read gradients from FIFO qmmm.out
+  // read gradients from qmmm.out
   double *qm_grad = nullptr;
   double *mm_grad = nullptr;
   if (comm->me == 0) {
@@ -250,6 +277,15 @@ void FixQmhub::post_force(int vflag)
   }
   memory->destroy(qm_grad_local);
   memory->destroy(mm_grad_local);
+}
+
+/* ---------------------------------------------------------------------- */
+
+void FixQmhub::end_of_step()
+{
+  if ((comm->me == 0) && (screen)) {
+    fprintf(screen, "   ESCF (Ha) = %f\n", E_SCF);
+  }
 }
 
 /* ---------------------------------------------------------------------- */
