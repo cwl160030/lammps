@@ -33,10 +33,15 @@ static const char cite_fix_qmhub[] =
 
 /* ---------------------------------------------------------------------- */
 
+// fix ID all qmhub qm_r_chrg qm_r_spin atomic_number1 atomic_number2 ...
 FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) : 
     Fix(lmp, narg, arg)
 {
-  // fix ID all qmhub qm_r_chrg qm_r_spin atomic_number1 atomic_number2 ...
+  // for compute_scalar()
+  scalar_flag = 1;
+  global_freq = 1;
+  extscalar   = 1;
+
   int ntypes = atom->ntypes;
   if (narg < 5+ntypes) utils::missing_cmd_args(FLERR, "fix qmhub", error);
   if (strcmp(arg[1], "all") != 0) error->all(FLERR, "fix qmhub error: group-ID must be 'all'");
@@ -61,7 +66,9 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) :
   int igroup_mm = group->find("MM");
   if (igroup_mm == -1) error->all(FLERR, "fix qmhub error: group 'MM' not defined");
   num_mm      = group->count(igroup_mm);
-  groupbit_mm = group->bitmask[igroup_mm]; 
+  groupbit_mm = group->bitmask[igroup_mm];
+
+  E_SCF = 0.0; 
 }
 
 /* ---------------------------------------------------------------------- */
@@ -415,5 +422,13 @@ void FixQmhub::get_lmp_data(double *qm_coord, double *qm_chrgs, int *qm_types, d
     memory->destroy(disp_mm_q);
   }
 }
+
+/* ---------------------------------------------------------------------- */
+
+// Add SCF Energy (Ha) to thermo via thermo_style custom ... f_ID ...
+double FixQmhub::compute_scalar()
+{
+  return E_SCF;
+} 
 
 /* ---------------------------------------------------------------------- */

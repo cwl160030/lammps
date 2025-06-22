@@ -21,13 +21,14 @@ class FixQmhub : public Fix {
   void setup(int) override;		// send positions and charges to QMHub
   void post_integrate() override;	// send positions and charges to QMHub
   void post_force(int) override;	// receive forces from QMHub
-  void end_of_step() override;
 
   void get_lmp_data(double *qm_coord,   // get positions, charges, and QM types
                     double *qm_chrgs, 
                     int    *qm_types, 
                     double *mm_coord, 
                     double *mm_chrgs);
+
+  double compute_scalar() override;	// For printing to thermo via thermo_style
 
  protected:
   int num_qm;				// Number of QM atoms

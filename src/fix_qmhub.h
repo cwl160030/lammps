@@ -28,6 +28,8 @@ class FixQmhub : public Fix {
                     double *mm_coord, 
                     double *mm_chrgs);
 
+  double compute_scalar() override;	// For printing to thermo via thermo_style
+
  protected:
   int num_qm;				// Number of QM atoms
   int num_mm;				// Number of MM atoms
