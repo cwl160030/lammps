@@ -1,0 +1,104 @@
+Manually updated list (see conda env list)
+base
+AmberTools23
+cpu-torchmd-net
+torchmd-net
+lammps
+pysemi
+-- Running check for auto-generated files from make-based build system
+-- Could NOT find FFMPEG (missing: FFMPEG_EXECUTABLE) 
+-- Checking for module 'fftw3'
+--   No package 'fftw3' found
+-- MDI download requested - we will build our own
+-- The C compiler identification is IntelLLVM 2021.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /opt/intel/oneapi/compiler/2021.2.0/linux/bin/icx - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Generating style headers...
+-- Generating package headers...
+-- Generating lmpinstalledpkgs.h...
+-- Could NOT find ClangFormat: Found unsuitable version "3.4.2", but required is at least "11.0" (found /usr/bin/clang-format)
+-- The following tools and libraries have been found and configured:
+ * Git
+ * MPI
+ * OpenMP
+ * JPEG
+ * PNG
+ * ZLIB
+ * TBB_MALLOC
+ * Python3
+
+-- <<< Build configuration >>>
+   LAMMPS Version:   20240829 5928389-modified
+   Operating System: Linux CentOS 7
+   CMake Version:    3.24.3
+   Build type:       RelWithDebInfo
+   Install path:     /home/chance/.local
+   Generator:        Unix Makefiles using /usr/bin/gmake
+-- Enabled packages: EXTRA-COMMAND;EXTRA-FIX;EXTRA-MOLECULE;EXTRA-PAIR;INTEL;KSPACE;MDI;MOLECULE;OPENMP;OPT
+-- <<< Compilers and Flags: >>>
+-- C++ Compiler:     /opt/intel/oneapi/compiler/2021.2.0/linux/bin/icpx
+      Type:          IntelLLVM
+      Version:       2021.2.0
+      C++ Standard:  11
+      C++ Flags:     -O2 -g -DNDEBUG
+      Defines:       LAMMPS_SMALLBIG;LAMMPS_MEMALIGN=64;LAMMPS_OMP_COMPAT=4;LAMMPS_JPEG;LAMMPS_PNG;LAMMPS_GZIP;FFT_KISS;LMP_MDI;LMP_OPENMP;LMP_INTEL;LMP_INTEL_USELRT;LMP_USE_MKL_RNG
+      Options:       -fp-model;precise;-Wno-tautological-constant-compare;-Wno-unused-command-line-argument
+-- C compiler:       /opt/intel/oneapi/compiler/2021.2.0/linux/bin/icx
+      Type:          IntelLLVM
+      Version:       2021.2.0
+      C Flags:       -O2 -g -DNDEBUG
+-- <<< Linker flags: >>>
+-- Executable name:  lmp
+-- Static library flags:    
+-- <<< MPI flags >>>
+-- MPI_defines:      MPICH_SKIP_MPICXX;OMPI_SKIP_MPICXX;_MPICC_H
+-- MPI includes:     /opt/intel/oneapi/mpi/2021.2.0/include
+-- MPI libraries:    /opt/intel/oneapi/mpi/2021.2.0/lib/libmpicxx.so;/opt/intel/oneapi/mpi/2021.2.0/lib/libmpifort.so;/opt/intel/oneapi/mpi/2021.2.0/lib/release/libmpi.so;/lib64/libdl.so;/lib64/librt.so;/lib64/libpthread.so;
+-- <<< FFT settings >>>
+-- Primary FFT lib:  KISS
+-- Using double precision FFTs
+-- Using non-threaded FFTs
+-- Using builtin distributed FFT algorithms
+-- Configuring done
+CMake Warning at CMakeLists.txt:244 (add_executable):
+  Cannot generate a safe runtime search path for target lmp because files in
+  some directories may conflict with libraries in implicit directories:
+
+    runtime library [libz.so.1] in /usr/lib64 may be hidden by files in:
+      /opt/intel/oneapi/intelpython/python3.7/lib
+    runtime library [libtbbmalloc.so.2] in /usr/lib64 may be hidden by files in:
+      /opt/intel/oneapi/intelpython/python3.7/lib
+
+  Some of these libraries may not be found correctly.
+
+
+-- Generating done
+-- Build files have been written to: /scratch/chance/lammps/build
+Usage: cmake --build <dir>             [options] [-- [native-options]]
+       cmake --build --preset <preset> [options] [-- [native-options]]
+Options:
+  <dir>          = Project binary directory to be built.
+  --preset <preset>, --preset=<preset>
+                 = Specify a build preset.
+  --list-presets
+                 = List available build presets.
+  --parallel [<jobs>], -j [<jobs>]
+                 = Build in parallel using the given number of jobs. 
+                   If <jobs> is omitted the native build tool's 
+                   default number is used.
+                   The CMAKE_BUILD_PARALLEL_LEVEL environment variable
+                   specifies a default parallel level when this option
+                   is not given.
+  --target <tgt>..., -t <tgt>... 
+                 = Build <tgt> instead of default targets.
+  --config <cfg> = For multi-configuration tools, choose <cfg>.
+  --clean-first  = Build target 'clean' first, then build.
+                   (To clean only, use --target 'clean'.)
+  --resolve-package-references={on|only|off}
+                 = Restore/resolve package references during build.
+  --verbose, -v  = Enable verbose output - if supported - including
+                   the build commands to be executed. 
+  --             = Pass remaining options to the native tool.
