@@ -25,7 +25,7 @@ cmake -DCMAKE_CXX_COMPILER=icpx \
       -DPKG_OPT=on \
       -DPKG_QMHUB=on \
       ../cmake
-cmake --build
+cmake --build build
 
 # In build
 # make
