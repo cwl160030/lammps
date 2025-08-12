@@ -43,6 +43,7 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) :
   extscalar   = 1;
 
   int ntypes = atom->ntypes;
+  printf("ntypes %d\n", ntypes); // CL
   if (narg < 5+ntypes) utils::missing_cmd_args(FLERR, "fix qmhub", error);
   if (strcmp(arg[1], "all") != 0) error->all(FLERR, "fix qmhub error: group-ID must be 'all'");
   qm_r_chrg = utils::inumeric(FLERR, arg[3], false, lmp);
@@ -91,6 +92,8 @@ int FixQmhub::setmask()
 {
   int mask = 0;
   mask |= POST_FORCE;
+  mask |= MIN_PRE_FORCE;
+  mask |= MIN_POST_FORCE;
   mask |= POST_INTEGRATE;
   return mask;
 }
@@ -120,7 +123,7 @@ void FixQmhub::setup(int vflag)
 
 void FixQmhub::post_integrate()
 {
-  // get positions, charges, QM atom types, and cell vectors 
+  // get positions, charges, QM atom types, and cell vectors. QMHub system call 
  
   double *qm_coord = nullptr;
   double *qm_chrgs = nullptr;
@@ -283,6 +286,24 @@ void FixQmhub::post_force(int vflag)
   }
   memory->destroy(qm_grad_local);
   memory->destroy(mm_grad_local);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Setup minimization functions using already defined MD functions.  */
+
+void FixQmhub::min_setup(int vflag)
+{
+  setup(vflag);
+}
+
+void FixQmhub::min_pre_force(int vflag)
+{
+  post_integrate();
+}
+
+void FixQmhub::min_post_force(int vflag)
+{
+  post_force(vflag);
 }
 
 /* ---------------------------------------------------------------------- */

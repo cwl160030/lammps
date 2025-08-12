@@ -1,0 +1,167 @@
+This package implements the "fix qmhub" command.
+
+This fix enables LAMMPS to be used as the MM driver in QM/MM simulations 
+through QMHub, a QM/MM interface (https://github.com/panxl/qmhub). QMHub 
+implements QM/MM with augmentary charges (QM/MM-AC) to model electrostatics. 
+Essentially, a cutoff around the QM region partitions the MM atoms into 
+inner and outer MM regions, and a charge projection scheme is used to project
+the outer MM charges onto the inner MM atoms, "augmenting" their charges. 
+This method may be applied to both periodic and non-periodic systems. For 
+more details, see https://doi.org/10.1063/5.0038120.
+
+QMHub allows coupling with a number of QM programs, including Q-Chem and 
+ORCA, among others.
+
+The "fix qmhub" command was written to be compatible with the 29Aug2024 and
+the 12Jun2025 versions of LAMMPS.
+
+-------------------------------------------------
+
+Installation
+============
+Aside from installing the source code via "make-yes qmhub" and building the
+LAMMPS executable, nothing special must be done in LAMMPS. This package 
+requires the QMHub python package (https://github.com/panxl/qmhub), which 
+itself requires the helPME library (https://github.com/andysim/helpme) for 
+Particle Mesh Ewald calculations. QMHub requires Python version >= 3.8.
+
+Step 1)
+
+Build LAMMPS with the QMHub package via "make-yes qmhub" and compile the
+executable with any other settings.
+
+Step 2)
+
+Build the helPME library.
+
+Check requirements and install helPME (https://github.com/andysim/helpme). 
+helPME is built with CMake. In the top-level folder, make a build folder 
+and compile:
+
+  mkdir -p build
+  cd build
+  cmake ..
+  make helpmelib
+
+Depending on your system, you may need additional CMake flags after "cmake ..",
+such as for specifying the locations of required packages and libraries (MKL/
+FFTW, Python executables, etc. These may be specified with -DFFTW_INCLUDES, etc.
+See the helPME documentation for more details).
+
+Upon successful compilation, this will produce a shared object file located in
+build/python/, with a name such as the following:
+
+  helpmelib.cpython-310-x86_64-linux-gnu.so
+
+This file is required for QMHub.
+
+Step 3)
+
+Install QMHub.
+
+Get the QMHub source code (https://github.com/panxl/qmhub). Note that QMHub 
+requires NumPy (https://numpy.org). In the top-level folder, install with
+
+  python -m pip install .
+
+This should install QMHub into your Python's site-packages. Copy the helPME
+shared object file to your /path/to/site-packages/qmhub folder. This completes 
+the installation of QMHub, which should be ready to use.
+
+Step 4)
+
+Install the QM package. The compatible QM package of choice should be 
+installed per its respective documentation.
+
+-------------------------------------------------
+
+Running QM/MM with QMHub and LAMMPS
+===================================
+
+QMHub interfaces MM packages with QM packages. For a QM/MM run with QMHub, the
+three requirements are a suitable MM package (in this case, LAMMPS), a suitable
+QM package, the MM package input files (LAMMPS input file), and a configuration 
+file for QMHub named "qmhub.ini". The "qmhub.ini" file has information regarding
+the QM/MM model options, the QM package, and the QM package input options. An 
+example "qmhub.ini" file is given below (see https://doi.org/10.1063/5.0038120 
+for details on the model parameters):
+
+*** Start example qmhub.ini file ***
+  [model]
+  switching_function = lrec
+  cutoff = 10.
+  pbc = TRUE
+  
+  [engine]
+  qchem
+
+  [qchem]
+  method = pbe0
+  basis = 6-31+g*
+  scf_convergence = 6
+  maxscf = 200
+  dft_d = d3_bj
+*** End example qmhub.ini file ***
+
+In the LAMMPS input file, the "fix qmhub" command is used as follows:
+
+  group QM ...
+  group MM ...
+  fix <ID> all qmhub <qm_r_chrg> <qm_r_spin> <atomic_numbers>
+
+Note that "fix qmhub" applies to the group "all." The additional arguments are
+defined as follows:
+
+  qm_r_chrg      : total charge of the QM region, int.
+  qm_r_spin      : spin multiplicity of the QM region, int.
+                   (1 for singlet, 2 for doublet, ...)
+  atomic_numbers : list of atomic numbers of atoms in the simulation, ordered
+                   by atom type in the simulation.
+
+As an example, if the QM region is a group of water molecules with two atom 
+types (1st:O, 2nd:H):
+
+  fix 1 all qmhub 0 1 8 1
+
+where 8 is the atomic number for O, 1 is the atomic number for H. Note if two
+types are defined for the same atom, the atomic number must be repeated (ex: 
+for water where each H is its own type, with 1st:O, 2nd:H1, 3rd:H2, the list 
+of atomic numbers would be 8 1 1).
+
+In the LAMMPS input file, the "fix qmhub" command has several requirements. 
+Two groups must be defined, one for the QM region and one for the MM region. 
+THESE GROUPS MUST BE NAMED "QM" AND "MM" AND MUST BE DISJOINT. The simulation 
+must either be periodic in all three directions or not periodic in any 
+direction; take care to ensure the periodicity of the simulation matches the
+"pbc=<TRUE/FALSE>" option in the "[model]" section of the "qmhub.ini" file. 
+The atom style used in the simulation must support atomic charges as these 
+are necessary for QMHub (ex: "atom_style charge") Currently, units must be set 
+to "real" for the sake of unit conversions for the SCF gradients. 
+
+The "fix qmhub" command can also print the QM SCF energy in the thermo output 
+via "thermo_style custom", ex: 
+
+  variable ESCF equal f_<ID>
+  thermo_style custom step temp etotal v_ESCF
+
+where <ID> is the fix ID for the "fix qmhub" command. As long as the QM package 
+may be run from the directory where LAMMPS will be run, the QM/MM job may be 
+executed like a normal LAMMPS run, ex:
+
+  mpirun -np <N> /path/to/lmp_executable -in in.lammps > out.lammps
+
+Note that parallel MM is supported.
+
+Upon running, along with the usual LAMMPS output/log files, a directory named
+"qmhub" will be created in the same directory where LAMMPS is run. QMHub uses 
+this directory to communicate with the QM package, currently through text. 
+LAMMPS creates a "qmmm.inp" file containing the QM/MM options, as well as the 
+charges and positions of the QM and MM atoms and the cell vectors. This is read 
+by QMHub, which will compute the augmentary charges, write the input file for 
+the QM package, and run the QM package. Once the QM package completes its 
+calculations, QMHub will read the QM output and write a "qmmm.out" file, which 
+contains the SCF energy (Ha) and the SCF gradients at each atomic position 
+(Ha/Bohr). These are read by LAMMPS, the gradients are converted to forces in 
+the proper units, and these QM forces are added to the atoms in the simulation. 
+This occurs at each timestep. Any relevant QM package input/output files will 
+be located in the "qmhub" directory.

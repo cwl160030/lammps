@@ -21,6 +21,9 @@ class FixQmhub : public Fix {
   void setup(int) override;		// send positions and charges to QMHub
   void post_integrate() override;	// send positions and charges to QMHub
   void post_force(int) override;	// receive forces from QMHub
+  void min_setup(int) override;	
+  void min_pre_force(int) override;	// is it necessary since setup calls post_integrate()?
+  void min_post_force(int) override;	// receive forces from QMHub
 
   void get_lmp_data(double *qm_coord,   // get positions, charges, and QM types
                     double *qm_chrgs, 
