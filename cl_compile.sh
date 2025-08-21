@@ -10,22 +10,36 @@ module load intel/2021.2.0
 module load impi/2021.2.0
 #mkdir build; cd build    # create and use a build directory
 cd build # use if build exists
+date
 cmake -DCMAKE_CXX_COMPILER=icpx \
       -DCMAKE_C_COMPILER=icx \
       -DCMAKE_Fortran_COMPILER=ifx \
+      -DPKG_AMOEBA=on \
+      -DPKG_COLVARS=on \
+      -DPKG_DRUDE=on \
       -DPKG_EXTRA-COMMAND=on \
+      -DPKG_EXTRA-DUMP=on \
       -DPKG_EXTRA-FIX=on \
       -DPKG_EXTRA-MOLECULE=on \
       -DPKG_EXTRA-PAIR=on \
+      -DPKG_FEP=on \
       -DPKG_INTEL=on \
       -DPKG_KSPACE=on \
+      -DPKG_MANIFOLD=on \
+      -DPKG_MISC=on \
       -DPKG_MOFF=on \
       -DPKG_MOLECULE=on \
       -DPKG_OPENMP=on \
       -DPKG_OPT=on \
+      -DPKG_ORIENT=on \
+      -DPKG_PHONON=on \
+      -DPKG_REPLICA=on \
+      -DPKG_RIGID=on \
       -DPKG_QMHUB=on \
       ../cmake
-cmake --build build
+cmake --build .
+
+date
 
 # In build
 # make
