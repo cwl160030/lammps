@@ -1,6 +1,7 @@
 #include "fix_qmhub.h"
 
 #include "atom.h"
+#include "force.h"
 #include "citeme.h"
 #include "comm.h"
 #include "domain.h"
@@ -18,6 +19,18 @@
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
+
+/* atom, atom_vec : position, force, molecule index
+ * neighbor* : neighbor lists
+ * group
+ * force
+ */
+
+/* To Do: 
+ * (1)  See exchange forces in QMMM
+ * (2)  Add hydrogen atom to QM calculation
+ * (3)  Redistribute QM/MM charges/forces like Amber
+ */
 
 static const char cite_fix_qmhub[] =
   "fix qmhub command: https://doi.org/10.1063/5.0038120\n\n"
@@ -43,11 +56,14 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) :
   extscalar   = 1;
 
   int ntypes = atom->ntypes;
-  printf("ntypes %d\n", ntypes); // CL
+  fprintf(screen, "%d ntypes\n", ntypes);
+  // printf("%d ntypes\n", ntypes);
   if (narg < 5+ntypes) utils::missing_cmd_args(FLERR, "fix qmhub", error);
   if (strcmp(arg[1], "all") != 0) error->all(FLERR, "fix qmhub error: group-ID must be 'all'");
   qm_r_chrg = utils::inumeric(FLERR, arg[3], false, lmp);
   qm_r_spin = utils::inumeric(FLERR, arg[4], false, lmp);
+
+  // Add keywords for charge conservation, charge balance, and H link atom
 
   if ((domain->xperiodic == 0) && (domain->yperiodic == 0) && (domain->zperiodic == 0)) is_pbc = 0;
   else if ((domain->xperiodic == 1) && (domain->yperiodic == 1) && (domain->zperiodic == 1)) is_pbc = 1;
@@ -140,6 +156,18 @@ void FixQmhub::post_integrate()
   }
 
   get_lmp_data(qm_coord, qm_chrgs, qm_types, mm_coord, mm_chrgs);  
+
+  // CL
+  // Get the MM QM charge difference
+  double total_mm_chrgs = 0.0, total_qm_chrgs = 0.0, qm_mm_chrgs_diff = 0.0;
+  for (int i=0; i < num_mm; i++){
+    total_mm_chrgs += mm_chrgs[i];
+    printf("MM Charge [%d] = %f\n", i, mm_chrgs[i]);
+  }
+  qm_mm_chrgs_diff = qm_r_chrg - total_mm_chrgs;
+  printf("MM Total Charge: %f\n", total_mm_chrgs);
+  printf("QM Total Charge: %d\n", qm_r_chrg);
+  printf("QM-MM Charge Difference: %f\n", qm_mm_chrgs_diff);
 
   if (comm->me == 0) {   
     FILE *fp_qmmm_inp = fopen("./qmhub/qmmm.inp", "w");
@@ -315,6 +343,13 @@ void FixQmhub::get_lmp_data(double *qm_coord, double *qm_chrgs, int *qm_types, d
   double  *q = atom->q;
   if (q == nullptr) error->all(FLERR, "fix qmhub error: atoms do not have 'q' attribute. Ensure atom style allows charges.");
   int *type = atom->type;  
+
+  // CL TESTING
+  int *tmp_nb = atom->num_bond;
+  int **tmp_ba = atom->bond_atom;
+  for (int i=0; i < sizeof(tmp_nb[0])/sizeof(int); i++){
+    printf("Number of Bonds %d\n", tmp_nb[i]);
+  }
 
   int num_qm_local = 0;
   int num_mm_local = 0;
