@@ -1,4 +1,11 @@
 #!/bin/bash
+#SBATCH --partition=batch
+#SBATCH --time=0-02:00:00
+#SBATCH --ntasks=8
+#  #SBATCH --cpus-per-task=1
+#SBATCH --output=job_output.txt
+#SBATCH --error=job_error.txt
+#SBATCH --job-name=lmp_comp
 
 # Source file inside LAMMPS directory
 source ~/act_conda.sh

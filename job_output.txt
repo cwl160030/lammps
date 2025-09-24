@@ -1,0 +1,112 @@
+Manually updated list (see conda env list)
+base
+AmberTools23
+cpu-torchmd-net
+torchmd-net
+lammps
+pysemi
+pycp2k
+sella
+Wed Sep 24 12:07:43 CDT 2025
+-- Running check for auto-generated files from make-based build system
+-- Could NOT find FFMPEG (missing: FFMPEG_EXECUTABLE) 
+-- Checking for module 'fftw3'
+--   No package 'fftw3' found
+-- Generating style headers...
+-- Generating package headers...
+-- Generating lmpinstalledpkgs.h...
+-- Could NOT find ClangFormat: Found unsuitable version "3.4.2", but required is at least "11.0" (found /usr/bin/clang-format)
+-- The following tools and libraries have been found and configured:
+ * Git
+ * MPI
+ * OpenMP
+ * JPEG
+ * PNG
+ * ZLIB
+ * TBB_MALLOC
+ * Python3
+
+-- <<< Build configuration >>>
+   LAMMPS Version:   20240829 79cfc23-modified
+   Operating System: Linux CentOS 7
+   CMake Version:    3.24.3
+   Build type:       RelWithDebInfo
+   Install path:     /home/chance/.local
+   Generator:        Unix Makefiles using /usr/bin/gmake
+-- Enabled packages: AMOEBA;COLVARS;DRUDE;EXTRA-COMMAND;EXTRA-DUMP;EXTRA-FIX;EXTRA-MOLECULE;EXTRA-PAIR;FEP;INTEL;KSPACE;MANIFOLD;MISC;MOLECULE;OPENMP;OPT;ORIENT;PHONON;QMHUB;REPLICA;RIGID
+-- <<< Compilers and Flags: >>>
+-- C++ Compiler:     /opt/intel/oneapi/compiler/2021.2.0/linux/bin/icpx
+      Type:          IntelLLVM
+      Version:       2021.2.0
+      C++ Standard:  11
+      C++ Flags:     -O2 -g -DNDEBUG
+      Defines:       LAMMPS_SMALLBIG;LAMMPS_MEMALIGN=64;LAMMPS_OMP_COMPAT=4;LAMMPS_JPEG;LAMMPS_PNG;LAMMPS_GZIP;FFT_KISS;LMP_OPENMP;LMP_INTEL;LMP_INTEL_USELRT;LMP_USE_MKL_RNG
+-- <<< Linker flags: >>>
+-- Executable name:  lmp
+-- Static library flags:    
+-- <<< MPI flags >>>
+-- MPI_defines:      MPICH_SKIP_MPICXX;OMPI_SKIP_MPICXX;_MPICC_H
+-- MPI includes:     /opt/intel/oneapi/mpi/2021.2.0/include
+-- MPI libraries:    /opt/intel/oneapi/mpi/2021.2.0/lib/libmpicxx.so;/opt/intel/oneapi/mpi/2021.2.0/lib/libmpifort.so;/opt/intel/oneapi/mpi/2021.2.0/lib/release/libmpi.so;/lib64/libdl.so;/lib64/librt.so;/lib64/libpthread.so;
+-- <<< FFT settings >>>
+-- Primary FFT lib:  KISS
+-- Using double precision FFTs
+-- Using non-threaded FFTs
+-- Using builtin distributed FFT algorithms
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /scratch/chance/lammps/build
+[  0%] Built target pointers.h
+[  0%] Built target region.h
+[  0%] Built target timer.h
+[  0%] Built target universe.h
+[  0%] Built target update.h
+[  0%] Built target utils.h
+[  1%] Built target variable.h
+[  2%] Built target fmt_core.h
+[  2%] Built target fmt_format.h
+[  2%] Built target atom.h
+[  2%] Built target bond.h
+[  2%] Built target citeme.h
+[  2%] Built target comm.h
+[  3%] Built target command.h
+[  3%] Built target compute.h
+[  3%] Built target dihedral.h
+[  3%] Built target domain.h
+[  3%] Built target error.h
+[  3%] Built target exceptions.h
+[  3%] Built target fix.h
+[  3%] Built target force.h
+[  3%] Built target group.h
+[  3%] Built target improper.h
+[  3%] Built target input.h
+[  3%] Built target info.h
+[  3%] Built target kspace.h
+[  3%] Built target lammps.h
+[  3%] Built target lattice.h
+[  3%] Built target library.h
+Consolidate compiler generated dependencies of target lepton
+[ 10%] Built target lepton
+Consolidate compiler generated dependencies of target colvars
+[ 14%] Built target colvars
+-- Git Directory: /scratch/chance/lammps/.git
+-- Generating lmpgitversion.h...
+[ 14%] Built target gitversion
+[ 14%] Built target angle.h
+[ 14%] Built target lmppython.h
+[ 14%] Built target lmptype.h
+[ 14%] Built target memory.h
+[ 14%] Built target modify.h
+[ 15%] Built target neighbor.h
+[ 15%] Built target neigh_list.h
+[ 15%] Built target output.h
+[ 15%] Built target pair.h
+[ 15%] Built target platform.h
+Consolidate compiler generated dependencies of target lammps
+[ 15%] Building CXX object CMakeFiles/lammps.dir/scratch/chance/lammps/src/QMHUB/fix_qmhub.cpp.o
+[ 15%] Linking CXX static library liblammps.a
+[100%] Built target lammps
+Consolidate compiler generated dependencies of target lmp
+[100%] Linking CXX executable lmp
+[100%] Built target lmp
+Wed Sep 24 12:08:48 CDT 2025
