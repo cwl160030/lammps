@@ -11,12 +11,16 @@ FixStyle(qmhub,FixQmhub);
 
 namespace LAMMPS_NS {
 
+
 class FixQmhub : public Fix {
  public:
   FixQmhub(class LAMMPS *, int, char **);
   ~FixQmhub() override;
   int setmask() override;
   void post_constructor() override;
+  // Need to pass pointer instead of vector
+  // std::vector<int> set_qm_atom_labels(int, char*, std::vector<int>);
+  void set_atomic_numbers(int, char*, int*);
 
   void setup(int) override;		// send positions and charges to QMHub
   void post_integrate() override;	// send positions and charges to QMHub
@@ -31,6 +35,13 @@ class FixQmhub : public Fix {
                     double *mm_coord, 
                     double *mm_chrgs);
 
+  void setup_qm_link(int nlinkatoms);   // Handle setup of QM-MM boundary
+  // void setup_qm_link(double *qm_coord,   // Handle setup of QM-MM boundary
+  //                   double *qm_chrgs, 
+  //                   int    *qm_types, 
+  //                   double *mm_coord, 
+  //                   double *mm_chrgs);
+
   double compute_scalar() override;	// For printing to thermo via thermo_style
 
  protected:
@@ -43,9 +54,13 @@ class FixQmhub : public Fix {
 					   in the simulation; ordered so
 					   atomic_numbers[i] corresponds to
 					   atom type i */
+  char *qm_atom_index_filename; // Pointer to name of file containing QM atomic numbers
+  // std::vector<int> qm_atom_labels; // Vector of QM atomic numbers
 
   int groupbit_qm;			// Groupbit for region 'QM'
   int groupbit_mm;			// Groupbit for region 'MM'
+
+  int nlinkatoms;
 
   double E_SCF;				// SCF Energy from QM package (Hartree)
 };

@@ -1,0 +1,250 @@
+void FixQmhub::setup_qm_link(double *qm_chrgs, int *qm_types, double *mm_chrgs, int nlinkatoms)
+{
+  int nlocal = atom->nlocal;
+  double **x = atom->x;
+  double  *q = atom->q;
+  if (q == nullptr) error->all(FLERR, "fix qmhub error: atoms do not have 'q' attribute. Ensure atom style allows charges.");
+  int *type = atom->type;  
+
+  int num_qm_local = 0;
+  int num_mm_local = 0;
+  for (int i = 0; i < nlocal; i++) {
+    if (atom->mask[i] & groupbit_qm) num_qm_local++;
+    if (atom->mask[i] & groupbit_mm) num_mm_local++;
+  }
+  
+  double *qm_chrgs_local = nullptr;
+  double *mm_chrgs_local = nullptr;
+  
+  memory->create(qm_chrgs_local, num_qm_local  , "fix/qmhub:qm_chrgs_local");
+  memory->create(mm_chrgs_local, num_mm_local  , "fix/qmhub:mm_chrgs_local");
+
+ // Use qm atoms to get nlinkatoms
+  for (int i = 0; i < nlocal; i++) {
+    if (atom->mask[i] & groupbit_qm) {
+      for (int j=0; j < atom->num_bond[i]; j++) {
+        if (atom->mask[bond_index[i][j]-1] & groupbit_mm) {
+          nlinkatoms += 1;
+        }
+      } 
+    }
+  }
+
+  double *qm_boundary_idx_local = nullptr;
+  double *mm1_boundary_idx_local = nullptr;
+
+  memory->create(qm_boundary_idx_local,  nlinkatoms, "fix/qmhub:qm_boundary_idx_local");
+  memory->create(mm1_boundary_idx_local, nlinkatoms, "fix/qmhub:mm1_boundary_idx_local");
+
+  printf("nlocal %d\n", nlocal);
+  int **bond_index = atom->bond_atom;
+
+  int count_qm = 0;
+  int count_mm = 0;
+  int nlinkatoms = 0;
+  double cluster_q = 0.0;
+  // std::vector<int> qm_boundary_idx;
+  // std::vector<int> mm1_boundary_idx;
+  // std::vector<int> global_boundary_atom_idx;
+  for (int i = 0; i < nlocal; i++) {
+    if (atom->mask[i] & groupbit_qm) {
+      qm_chrgs_local[count_qm] = q[i];
+      cluster_q += q[i]; // Get charges for QM cluster atoms
+      count_qm++;
+      // Start bond search
+      // Indexing: i indexes 0, bond_index indexes 1
+      for (int j=0; j < atom->num_bond[i]; j++) {
+        if (atom->mask[bond_index[i][j]-1] & groupbit_mm) {
+          printf("QM1 %d MM1 %d\n", i+1, bond_index[i][j]);
+          cluster_q += q[bond_index[i][j]-1]; // Charges for MM1 atoms
+          qm_boundary_idx_local[i] = i;
+          mm1_boundary_idx_local[i] = atom->tag[bond_index[i][j]-1];
+          nlinkatoms += 1;
+          // qm_boundary_idx.push_back(i); // QM boundary index
+          // mm1_boundary_idx.push_back(bond_index[i][j]-1); // MM1 boundary index
+        }
+      } // End bond search
+    }
+    if (atom->mask[i] & groupbit_mm) {
+      mm_chrgs_local[count_mm] = q[i];
+      count_mm++;
+    }
+  }
+
+
+
+
+  // Get the MM QM charge difference
+  double qmmm_delta_q = 0.0;
+  qmmm_delta_q = cluster_q - (double) qm_r_chrg;
+  printf("Cluster  Charge:   %f\n", cluster_q);
+  printf("QM Int   Charge:   %d\n", qm_r_chrg);
+  printf("Charge Difference: %f\n", qmmm_delta_q);
+
+
+  int num_nba = count_mm - nlinkatoms; // N_MM - N_MM1 = N_nonboundary MM atoms
+  double redis_charge = 0.0;
+  printf("This system has %d link-atoms\n", nlinkatoms);
+  // Avoid divide by 0
+  if (fabs(qmmm_delta_q) > 0) {
+    redis_charge = qmmm_delta_q / num_nba;
+    printf("redis_charge %f\n", redis_charge);
+    // update
+    // for (int i : qm_boundary_idx) {}
+      // atom->q[i] = 0; // Zero QM
+    for (int i=0; i < nlinkatoms; i++) {
+      atom->q[qm_boundary_idx_local[i]] = 0; // Zero QM
+    }
+    // update
+    // for (int i : mm1_boundary_idx) {}
+      // atom->q[i] = 0; // Zero MM1
+    for (int i=0; i < nlinkatoms; i++) {
+      atom->q[mm1_boundary_idx_local[i]] = 0; // Zero MM1
+    }
+    // Check if MM and not MM1 : not efficient -CL
+    for (int i = 0; i < nlocal; i++) {
+      if (atom->mask[i] & groupbit_mm) {
+        // update
+        // if (std::find(mm1_boundary_idx.begin(), mm1_boundary_idx.end(), i) == mm1_boundary_idx.end()) {}
+          // atom->q[i] = q[i] + redis_charge;
+        if (std::find(std::begin(mm1_boundary_idx_local), std::end(mm1_boundary_idx_local), i) == std::end(mm1_boundary_idx_local)) {
+          atom->q[i] = q[i] + redis_charge;
+        }
+      }
+    }
+  }
+  // for (int k=0; k < nlinkatoms; k++) {
+  //   printf("Boundary atoms: QM %d - MM %d\n", global_boundary_atom_idx[2*k], global_boundary_atom_idx[2*k+1]);
+  // }
+
+  memory->destroy(qm_chrgs_local);
+  memory->destroy(mm_chrgs_local);
+  memory->destroy(qm_boundary_idx_local);
+  memory->destroy(mm1_boundary_idx_local);
+
+  // QUESTION: Do I need to gather here? -CL
+  // nlinkatoms should sum regardless,
+  // charges should work (check indexing),
+  // save link atom work for after integration.
+
+}
+
+
+
+
+
+// BAD VERSION
+
+void FixQmhub::setup_qm_link(double *qm_chrgs, int *qm_types, double *mm_chrgs, int nlinkatoms)
+{
+ // Use qm atoms to get nlinkatoms
+  for (int i = 0; i < nlocal; i++) {
+    if (atom->mask[i] & groupbit_qm) {
+      for (int j=0; j < atom->num_bond[i]; j++) {
+        if (atom->mask[bond_index[i][j]-1] & groupbit_mm) {
+          nlinkatoms += 1;
+        }
+      } 
+    }
+  }
+
+  double *qm_boundary_idx = nullptr;
+  double *mm1_boundary_idx = nullptr;
+  memory->create(qm_boundary_idx,  nlinkatoms, "fix/qmhub:qm_boundary_idx");
+  memory->create(mm1_boundary_idx, nlinkatoms, "fix/qmhub:mm1_boundary_idx");
+
+  int **bond_index = atom->bond_atom;
+  double cluster_q = 0.0;
+  /* 
+  *  WARNING: This is dangerous as atom->natoms can be huge...
+  *  Later change to work with local atom indexing.
+  *  Motivation is we need to sum everything to one charge
+  *  difference and then divide it from ALL non QM/MM1 atoms.
+  */
+  for (int i = 0; i < atom->natoms; i++) {
+    if (atom->mask[i] & groupbit_qm) {
+      cluster_q += q[i]; // Charges for QM cluster atoms
+      // Start bond search : i index 0, bond_index index 1
+      for (int j=0; j < atom->num_bond[i]; j++) {
+        if (atom->mask[bond_index[i][j]-1] & groupbit_mm) {
+          printf("QM1 %d MM1 %d\n", i+1, bond_index[i][j]);
+          cluster_q += q[bond_index[i][j]-1]; // Charges for MM1 atoms
+          qm_boundary_idx[i] = i;
+          mm1_boundary_idx[i] = atom->tag[bond_index[i][j]-1];
+          nlinkatoms += 1;
+        }
+      } // End bond search
+    }
+  }
+
+  // Get the MM QM charge difference
+  double qmmm_delta_q = 0.0;
+  qmmm_delta_q = cluster_q - (double) qm_r_chrg;
+  printf("Cluster  Charge:   %f\n", cluster_q);
+  printf("QM Int   Charge:   %d\n", qm_r_chrg);
+  printf("Charge Difference: %f\n", qmmm_delta_q);
+
+  int num_nba = count_mm - nlinkatoms; // N_MM - N_MM1 = N_nonboundary MM atoms
+  double redis_charge = 0.0;
+  printf("This system has %d link-atoms\n", nlinkatoms);
+
+  if (fabs(qmmm_delta_q) > 0) { // Avoid divide by 0
+    redis_charge = qmmm_delta_q / num_nba;
+    printf("redis_charge %f\n", redis_charge);
+    for (int i=0; i < nlinkatoms; i++) {
+      atom->q[qm_boundary_idx[i]] = 0; // Zero QM
+      printf("Charge[%d] =  %f\n", qm_boundary_idx, atom->q[qm_boundary_idx[i]]);
+    }
+    for (int i=0; i < nlinkatoms; i++) {
+      atom->q[mm1_boundary_idx[i]] = 0; // Zero MM1
+      printf("Charge[%d] =  %f\n", mm1_boundary_idx, atom->q[mm1_boundary_idx[i]]);
+    }
+    for (int i = 0; i < nlocal; i++) {
+      if (atom->mask[i] & groupbit_mm) {
+        if (std::find(std::begin(mm1_boundary_idx_local), std::end(mm1_boundary_idx_local), i) == std::end(mm1_boundary_idx_local)) {
+          atom->q[i] = q[i] + redis_charge;
+          printf("Charge[%d] =  %f\n", i, atom->q[i]);
+        }
+      }
+    }
+  }
+}
+
+
+
+  // for (int i = 0; i < nlocal; i++) {
+  //   if (atom->mask[i] & groupbit_qm) {
+  //     for (int j=0; j < atom->num_bond[i]; j++) {
+  //       if (atom->mask[bond_index[i][j]-1] & groupbit_mm) {
+  //         nlinkatoms_local += 1;
+  //       }
+  //     } 
+  //   }
+  // }
+
+  // if (num_nba > 0) {
+  //   for (int i = 0; i < nlocal; i++) {
+  //     if (atom->mask[i] & groupbit_qm) {
+  //       qm_chrgs_local[count_qm] = 0; // Zero QM
+  //       count_qm++;
+  //     }
+  //   }
+  //   printf("E2\n");
+  //   for (int i=0; i < nlinkatoms; i++) {
+  //     mm_chrgs_local[mm1_boundary_idx_local[i]] = 0; // Zero MM1
+  //   }
+  // }
+
+
+
+    // for (int j=0; j < nlinkatoms_local; j++) {
+    //   for (int i=0; i < nlocal; i++) {
+    //     if (atom->mask[i] & groupbit_mm) {
+    //       if (mm1_boundary_idx_local[j] == i) {
+    //         printf("mm_q_local[%d] = %f + %f\n", count_mm, mm_chrgs_local[count_mm], redis_charge);
+    //         mm_chrgs_local[count_mm] += redis_charge;
+    //         count_mm++;
+    //       }
+    //     }
+    //   }
+    // }

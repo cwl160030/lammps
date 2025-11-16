@@ -1,0 +1,58 @@
+/* -*- c++ -*-------------------------------------------------------------
+   LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
+   https://www.lammps.org/, Sandia National Laboratories
+   LAMMPS development team: developers@lammps.org
+
+   Copyright (2003) Sandia Corporation.  Under the terms of Contract
+   DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
+   certain rights in this software.  This software is distributed under
+   the GNU General Public License.
+
+   See the README file in the top-level LAMMPS directory.
+------------------------------------------------------------------------- */
+
+/* -----------------------------------------------------------------------
+   Loosely based on ndx2group in EXTRA-COMMAND
+   Reads index file to create QM atom labels. This avoids 
+   using label_map typelabel vectors, which can be used for other
+   things e.g. REACTOR/KIM FFs and writing the QM atom types to a file is 
+   relatively easy. 
+  
+   Don't need to label every atom, just the atom types! 
+   Treats each value as a string. For now use atom numbers. 
+
+   Example for QM Water: 
+
+   8    1
+------------------------------------------------------------------------- */
+
+#ifdef COMMAND_CLASS
+// clang-format off
+CommandStyle(read_qm_atomlabels,Read_QM_Atomlabels);
+// clang-format on
+#else
+
+#ifndef LMP_READ_QM_ATOMLABELS_H
+#define LMP_READ_QM_ATOMLABELS_H
+
+#include "command.h"
+#include <vector>
+
+namespace LAMMPS_NS {
+
+// class QM_Atomlabels {
+//  public:
+//   QM_Atomlabels();
+//   std::vector<tagint> *qm_atomlabels;
+// }
+
+class Read_QM_Atomlabels : public Command {
+ public:
+  // std::vector<tagint> qm_atomlabels; // try *qm_atomlabels; ?
+  Read_QM_Atomlabels(class LAMMPS *lmp) : Command(lmp) {};
+  void command(int, char **) override;
+};
+}    // namespace LAMMPS_NS
+
+#endif
+#endif

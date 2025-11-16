@@ -1,0 +1,107 @@
+/* -*- c++ -*---------------------------------------------------------------
+   LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
+   https://www.lammps.org/, Sandia National Laboratories
+   LAMMPS development team: developers@lammps.org
+
+   Copyright (2003) Sandia Corporation.  Under the terms of Contract
+   DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
+   certain rights in this software.  This software is distributed under
+   the GNU General Public License.
+
+   See the README file in the top-level LAMMPS directory.
+------------------------------------------------------------------------- */
+
+#include "read_qm_atomlabels.h"
+
+#include "atom.h"
+#include "comm.h"
+#include "error.h"
+#include "tokenizer.h"
+
+#include <iostream>
+
+using namespace LAMMPS_NS;
+static constexpr int BUFLEN = 4096;
+
+// Just need to read ints in list
+
+static std::vector<tagint> read_section(FILE *fp)
+{
+  char linebuf[BUFLEN];
+  std::vector<tagint> tagbuf;
+
+  // Read line in fp
+  while (fgets(linebuf, BUFLEN, fp)) {
+    // Tokenize values in linebuf
+    ValueTokenizer values(linebuf);
+    // vector pushback tagbuf
+    while (values.has_next()) tagbuf.push_back(values.next_tagint());
+  }
+  // return tagbuf vector <tagint>
+  return tagbuf;
+}
+
+/* ---------------------------------------------------------------------- */
+
+void Read_QM_Atomlabels::command(int narg, char **arg)
+{
+  int len;
+  bigint num;
+  FILE *fp;
+
+  if (narg < 1) utils::missing_cmd_args(FLERR, "read_qm_atomlabels", error);
+  // Add sanity check that atoms even exist! -CL
+  if (comm->me == 0) {
+    fp = fopen(arg[0], "r");
+    if (fp == nullptr)
+      error->one(FLERR, "Cannot open QM atom labels file for reading: {}", utils::getsyserror());
+    utils::logmesg(lmp, "Reading QM atom labels from index file {}:\n", arg[0]);
+  }
+
+  if (narg == 1) {
+    std::vector<tagint> qm_atomlabels;
+    try {
+      qm_atomlabels = read_section(fp);
+    } catch (std::exception &e) {
+      error->one(FLERR, e.what());
+    }
+    num = qm_atomlabels.size();
+    // Consider Bcast ? -CL
+    MPI_Bcast(&num, 1, MPI_LMP_BIGINT, 0, world);
+    MPI_Bcast((void *) qm_atomlabels.data(), num, MPI_LMP_TAGINT, 0, world);
+    // int ntypes = atom->ntypes;
+    // Check ntypes is equal to number of tag values
+    if (atom->ntypes != (int) qm_atomlabels.size()) { 
+      error->one(FLERR, "Number of atom types != number of labels in qm_atomlabels file.", utils::getsyserror());
+    } 
+    // else {
+    //   for (bigint i = 0; i < (int) tags.size(); ++i) {
+    //     std::cout << "QM TAGS: " << tags[i] << std::endl;
+    //   }
+    // } 
+  } else error->one(FLERR, "Incorrect number of arguments for command: read_qm_atomlabels", utils::getsyserror());
+  if (comm->me == 0) fclose(fp);
+  for (bigint i = 0; i < (int) qm_atomlabels.size(); ++i) {
+    printf("QM ATOM LABELS %d\n",qm_atomlabels[i]);
+  }
+  // return (void) qm_atomlabels; // tags or qm_atomlabels vector ? -CL
+}
+
+/* ---------------------------------------------------------------------- */
+
+// std::vector<tagint> *READ_QM_Atomlabels::set_qm_atomlabels(const std::vector<tagint> qm_atomlabels)
+// {
+//  return *qm_atom_labels;
+// }
+// Remove create
+// void Read_QM_Atomlabels::create(const std::vector<tagint> &tags)
+// {
+//   // map from global to local
+//   // const int nlocal = atom->nlocal;
+//   // int *flags = (int *) calloc(nlocal, sizeof(int));
+//   for (bigint i = 0; i < (int) tags.size(); ++i) {
+//     // const int id = atom->map(tags[i]);
+//     // if (id < nlocal && id >= 0) flags[id] = 1;
+//   }
+//   // free(flags);
+// }
