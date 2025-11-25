@@ -630,10 +630,8 @@ void FixQmhub::setup_qm_link(int nlinkatoms)
   double redis_charge = 0.0;
   printf("This system has %d QM link-atoms\n", nlinkatoms);
 
-  printf("E1\n");
   // Case where qm_r_chrg = 0 and qmmm_delta_q = 0 but running QMMM (think UFF4MOFF)
 
-  printf("E3\n");
   if (fabs(qmmm_delta_q) > 0 && num_nba > 0) { // Avoid divide by 0
     // Send redis_charge to local
     redis_charge = qmmm_delta_q / num_nba;
@@ -641,10 +639,8 @@ void FixQmhub::setup_qm_link(int nlinkatoms)
     MPI_Scatter(&redis_charge, 1, MPI_DOUBLE, &redis_charge_local, 1, MPI_DOUBLE, 0, world);
     // Check if MM and not MM1 : not efficient -CL
     count_mm = 0;
-    printf("E4\n");
   }
 
-  printf("E5\n");
   // MPI_Gatherv(qm_chrgs_local, num_qm_local  , MPI_DOUBLE, qm_chrgs, recv_qm_q, disp_qm_q, MPI_DOUBLE, 0, world);
   // MPI_Gatherv(qm_types_local, num_qm_local  , MPI_INT   , qm_types, recv_qm_t, disp_qm_t, MPI_INT   , 0, world);
   // MPI_Gatherv(mm_chrgs_local, num_mm_local  , MPI_DOUBLE, mm_chrgs, recv_mm_q, disp_mm_q, MPI_DOUBLE, 0, world);
@@ -670,7 +666,6 @@ void FixQmhub::setup_qm_link(int nlinkatoms)
     printf("qMM1[%d] = %f\n", mm1_boundary_idx_local[j], atom->q[mm1_boundary_idx_local[j]]);
   }
 
-  printf("E6\n");
   memory->destroy(qm_chrgs_local);
   memory->destroy(mm_chrgs_local);
   memory->destroy(qm_boundary_idx_local);
