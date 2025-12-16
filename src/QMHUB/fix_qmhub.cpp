@@ -34,6 +34,7 @@ using namespace FixConst;
 
 /* Tasks
  * (0)   -   Current: Getting boundary atoms: setup_qm_link
+ *                    - Upating every time because atom order can change?
  * (1)   -   Set angle, dihedral, pair, etc. QM-MM1 terms to 0: setup_qm_link
  * (2) Done  Charge conservation: setup_qm_link
  * (3) Done  Charge redistribution: setup_qm_link
@@ -652,12 +653,12 @@ void FixQmhub::setup_qm_link(int nlinkatoms)
     // Zero out QM charges
     if (atom->mask[i] & groupbit_qm) {
       atom->q[i] = 0;
-      printf("q[%d] = %f\n", i, atom->q[i]);
+      // printf("q[%d] = %f\n", i, atom->q[i]);
     }
     // Zero adjust MM charges
     if (atom->mask[i] & groupbit_mm) {
       atom->q[i] += redis_charge; // mm_chrgs_local[count_mm];
-      printf("q[%d] = %f\n", i, atom->q[i]);
+      // printf("q[%d] = %f\n", i, atom->q[i]);
       count_mm++;
     }
   }
@@ -665,6 +666,7 @@ void FixQmhub::setup_qm_link(int nlinkatoms)
     atom->q[mm1_boundary_idx_local[j]] = 0;
     printf("qMM1[%d] = %f\n", mm1_boundary_idx_local[j], atom->q[mm1_boundary_idx_local[j]]);
   }
+
 
   memory->destroy(qm_chrgs_local);
   memory->destroy(mm_chrgs_local);
