@@ -2,6 +2,9 @@
 
 #include "atom.h"
 #include "force.h"
+#include "neighbor.h"
+#include "neigh_list.h"
+#include "neigh_request.h"
 #include "citeme.h"
 #include "comm.h"
 #include "domain.h"
@@ -34,8 +37,9 @@ using namespace FixConst;
 
 /* Tasks
  * (0)   -   Current: Getting boundary atoms: setup_qm_link
- *                    - Upating every time because atom order can change?
- * (1)   -   Set angle, dihedral, pair, etc. QM-MM1 terms to 0: setup_qm_link
+ *               - Upating every time because atom order can change?
+ *               - Have setup_qm_link pass link atom information
+ * (1)   -   Create charge, bond, angle, dihedral, pair functions to 0 out terms separate from setup_qm_link
  * (2) Done  Charge conservation: setup_qm_link
  * (3) Done  Charge redistribution: setup_qm_link
  * (4)   -   Add hydrogen atom to QM calculation: post_integrate
@@ -53,6 +57,22 @@ static const char cite_fix_qmhub[] =
   " number =  2, \n"
   " pages =   024115\n"
   "}\n\n";
+
+/* ---------------------------------------------------------------------- */
+
+// Need FixQmhub::init() to make neighbor request
+void FixQmhub::init()
+{
+  // Remove if not needed
+  neighbor->add_request(this, NeighConst::REQ_OCCASIONAL);
+}
+
+/* ---------------------------------------------------------------------- */
+
+void FixQmhub::init_list(int /*id*/, NeighList *ptr)
+{
+  list = ptr;
+}
 
 /* ---------------------------------------------------------------------- */
 
@@ -121,11 +141,6 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) : Fix(lmp, narg, arg)
   // Setting QM atomic numbers for QCHEM input file
   set_atomic_numbers(narg, qm_atom_index_filename, atomic_numbers);
 
-  // Working for debugging QM Atom labels -CL
-  // for (int i=0; i <= sizeof(atomic_numbers) / sizeof(int); i++){
-  //   printf("QM Atom: %d\n", atomic_numbers[i]);
-  // }
-
   if ((domain->xperiodic == 0) && (domain->yperiodic == 0) && (domain->zperiodic == 0)) is_pbc = 0;
   else if ((domain->xperiodic == 1) && (domain->yperiodic == 1) && (domain->zperiodic == 1)) is_pbc = 1;
   else error->all(FLERR, "fix qmhub error: cell must either be periodic in all directions or not periodic in all directions");
@@ -135,18 +150,27 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) : Fix(lmp, narg, arg)
   if (igroup_qm == -1) error->all(FLERR, "fix qmhub error: group 'QM' not defined");
   num_qm      = group->count(igroup_qm);
   groupbit_qm = group->bitmask[igroup_qm];
+  double total_qm_charge = group->charge(igroup_qm); // Total QM charge
 
   int igroup_mm = group->find("MM");
   if (igroup_mm == -1) error->all(FLERR, "fix qmhub error: group 'MM' not defined");
   num_mm      = group->count(igroup_mm);
   groupbit_mm = group->bitmask[igroup_mm];
+  double total_mm_charge = group->charge(igroup_mm); // Total MM charge
 
   // Get boundary atoms
   int nlinkatoms = 0; // might need to be ptr for gather?
+  int *qm_boundary_idx = nullptr;
+  int *mm1_boundary_idx = nullptr;
 
   // Setup QM-MM boundary terms
   setup_qm_link(nlinkatoms);
   
+  // Begin Zero out Bonds
+
+  // End Zero out Boonds
+
+  printf("SETUP QM LINK DONE\n");
   // Count number of link atoms needed
   // Conserve Charge
   // Zero out MM1 charge
@@ -160,6 +184,9 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) : Fix(lmp, narg, arg)
 FixQmhub::~FixQmhub()
 {
   memory->destroy(atomic_numbers);
+  // Unsure when to destory boundary index array
+  memory->destroy(qm_boundary_idx);
+  memory->destroy(mm1_boundary_idx);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -535,148 +562,271 @@ void FixQmhub::get_lmp_data(double *qm_coord, double *qm_chrgs, int *qm_types, d
   }
 }
 
-/* ---------------------------------------------------------------------- */
-void FixQmhub::setup_qm_link(int nlinkatoms)
+
+void FixQmhub::set_qmmm_charges(int nlinkatoms, int count_nlink_local, double mm1_charges_local, int *qm_boundary_idx_local, int *mm1_boundary_idx_local)
 {
+  // Zero out QM and MM1 charges and redistribute this charge to non QMMM1 atoms.
+  // The charge to be redistributed q_red = q_qm + q_mm1 - q_qm(int)
   int nlocal = atom->nlocal;
-  double **x = atom->x;
-  double  *q = atom->q;
-  if (q == nullptr) error->all(FLERR, "fix qmhub error: atoms do not have 'q' attribute. Ensure atom style allows charges.");
-  int *type = atom->type;  
+  int num_non_qmmm1_atoms = 0;
+  double mm1_charges = 0.0;
+  double qmmm_delta_q = 0.0;
+  double redis_charge = 0.0; 
 
-  int num_qm_local = 0;
-  int num_mm_local = 0;
-  for (int i = 0; i < nlocal; i++) {
-    if (atom->mask[i] & groupbit_qm) num_qm_local++;
-    if (atom->mask[i] & groupbit_mm) num_mm_local++;
-  }
-  
-  int **bond_index = atom->bond_atom;
-  int nlinkatoms_local = 0; 
-  double *qm_chrgs_local = nullptr;
-  double *mm_chrgs_local = nullptr;
-  
-  memory->create(qm_chrgs_local, num_qm_local  , "fix/qmhub:qm_chrgs_local");
-  memory->create(mm_chrgs_local, num_mm_local  , "fix/qmhub:mm_chrgs_local");
-
- // Use qm atoms to get nlinkatoms_local
-  for (int i = 0; i < nlocal; i++) {
-    if (atom->mask[i] & groupbit_qm) {
-      for (int j=0; j < atom->num_bond[i]; j++) {
-        if (atom->mask[bond_index[i][j]-1] & groupbit_mm) {
-          nlinkatoms_local += 1;
-        }
-      } 
-    }
-  }
-
-  int *qm_boundary_idx_local = nullptr;
-  int *mm1_boundary_idx_local = nullptr;
-
-  memory->create(qm_boundary_idx_local,  nlinkatoms_local, "fix/qmhub:qm_boundary_idx_local");
-  memory->create(mm1_boundary_idx_local, nlinkatoms_local, "fix/qmhub:mm1_boundary_idx_local");
-
-  printf("nlocal %d\n", nlocal);
-
-  int count_qm = 0;
-  int count_mm = 0;
-  double cluster_q_local = 0.0;
-  double cluster_q = 0.0;
-  int count_boundary = 0;
-  for (int i = 0; i < nlocal; i++) {
-    if (atom->mask[i] & groupbit_qm) {
-      qm_chrgs_local[count_qm] = q[i];
-      cluster_q_local += q[i]; // Get charges for QM cluster atoms
-      printf("QM_cluster[%d] = %f\n", i, q[i]);
-      count_qm++;
-      // Start bond search
-      // Indexing: i indexes 0, bond_index indexes 1
-      for (int j=0; j < atom->num_bond[i]; j++) {
-        if (atom->mask[bond_index[i][j]-1] & groupbit_mm) {
-          printf("QM1 %d MM1 %d\n", i+1, bond_index[i][j]);
-          cluster_q_local += q[bond_index[i][j]-1]; // Charges for MM1 atoms
-          printf("MM_cluster[%d] = %f\n", bond_index[i][j]-1, q[bond_index[i][j]-1]);
-          qm_boundary_idx_local[count_boundary] = i;
-          printf("qm_boundary_idx_local[%d] %d\n", count_boundary, i);
-          // need tag?
-          // mm1_boundary_idx_local[count_boundary] = atom->tag[bond_index[i][j]-1];
-          mm1_boundary_idx_local[count_boundary] = bond_index[i][j]-1;
-          printf("mm1_boundary_idx_local[%d] %d\n", count_boundary, bond_index[i][j]-1);
-          count_boundary++;
-        }
-      } // End bond search
-    }
-    if (atom->mask[i] & groupbit_mm) {
-      mm_chrgs_local[count_mm] = q[i];
-      count_mm++;
-    }
-  }
-
-  printf("cluster_q_local sum = %f\n", cluster_q_local);
   int nprocs, root;
   MPI_Comm_size(world, &nprocs); // how many procs are in use
-  // Sum nlinkatoms and cluster_q
-  MPI_Allreduce(&nlinkatoms_local, &nlinkatoms, 1, MPI_INT, MPI_SUM, world);
-  MPI_Allreduce(&cluster_q_local, &cluster_q, 1, MPI_DOUBLE, MPI_SUM, world);
+  MPI_Allreduce(&mm1_charges_local, &mm1_charges, 1, MPI_DOUBLE, MPI_SUM, world);
 
-  // Get the MM QM charge difference
-  double qmmm_delta_q = 0.0;
-  qmmm_delta_q = cluster_q - (double) qm_r_chrg;
-  printf("Cluster  Charge:   %f\n", cluster_q);
-  printf("QM Int   Charge:   %d\n", qm_r_chrg);
-  printf("Charge Difference: %f\n", qmmm_delta_q);
+  qmmm_delta_q = total_qm_charge + mm1_charges - (double) qm_r_chrg;
 
-  int num_nba = count_mm - nlinkatoms; // N_MM - N_MM1 = N_nonboundary MM atoms
-  double redis_charge_local = 0.0;
-  double redis_charge = 0.0;
-  printf("This system has %d QM link-atoms\n", nlinkatoms);
+  printf("Cluster  Charge:   %f\n", total_qm_charge); // g
+  printf("MM1      Charge:   %f\n", mm1_charges); // g
+  printf("QM Int   Charge:   %d\n", qm_r_chrg); // g
+  printf("Charge Difference: %f\n", qmmm_delta_q); // pass
+  printf("This system has %d QM link-atoms\n", nlinkatoms); // g
 
-  // Case where qm_r_chrg = 0 and qmmm_delta_q = 0 but running QMMM (think UFF4MOFF)
+  num_non_qmmm1_atoms = num_mm - nlinkatoms;
+  if (num_non_qmmm1_atoms > 0) redis_charge = qmmm_delta_q / num_non_qmmm1_atoms;
 
-  if (fabs(qmmm_delta_q) > 0 && num_nba > 0) { // Avoid divide by 0
-    // Send redis_charge to local
-    redis_charge = qmmm_delta_q / num_nba;
-    printf("redis_charge %f\n", redis_charge);
-    MPI_Scatter(&redis_charge, 1, MPI_DOUBLE, &redis_charge_local, 1, MPI_DOUBLE, 0, world);
-    // Check if MM and not MM1 : not efficient -CL
-    count_mm = 0;
-  }
-
-  // MPI_Gatherv(qm_chrgs_local, num_qm_local  , MPI_DOUBLE, qm_chrgs, recv_qm_q, disp_qm_q, MPI_DOUBLE, 0, world);
-  // MPI_Gatherv(qm_types_local, num_qm_local  , MPI_INT   , qm_types, recv_qm_t, disp_qm_t, MPI_INT   , 0, world);
-  // MPI_Gatherv(mm_chrgs_local, num_mm_local  , MPI_DOUBLE, mm_chrgs, recv_mm_q, disp_mm_q, MPI_DOUBLE, 0, world);
-
-  count_qm = 0;
-  count_mm = 0;
   // Change the charges for the atoms class
   for (int i = 0; i < nlocal; i++) {
     // Zero out QM charges
     if (atom->mask[i] & groupbit_qm) {
       atom->q[i] = 0;
-      // printf("q[%d] = %f\n", i, atom->q[i]);
     }
-    // Zero adjust MM charges
+    // Adjust MM charges
     if (atom->mask[i] & groupbit_mm) {
-      atom->q[i] += redis_charge; // mm_chrgs_local[count_mm];
-      // printf("q[%d] = %f\n", i, atom->q[i]);
-      count_mm++;
+      atom->q[i] += redis_charge;
     }
   }
-  for (int j=0; j < nlinkatoms_local; j++) {
+  // Zero out MM1 charges
+  for (int j=0; j < count_nlink_local; j++) {
     atom->q[mm1_boundary_idx_local[j]] = 0;
     printf("qMM1[%d] = %f\n", mm1_boundary_idx_local[j], atom->q[mm1_boundary_idx_local[j]]);
   }
 
-
-  memory->destroy(qm_chrgs_local);
-  memory->destroy(mm_chrgs_local);
-  memory->destroy(qm_boundary_idx_local);
-  memory->destroy(mm1_boundary_idx_local);
-
-  // To update charges globally, see how positions are updated after timestep
-
+  for (int i = 0; i < nlocal; i++) {
+    // Zero out QM charges
+    if (atom->mask[i] & groupbit_qm) {
+      printf("Q[%d] = %f\n", i, atom->q[i]);
+    }
+    // Adjust MM charges
+    if (atom->mask[i] & groupbit_mm) {
+      printf("Q[%d] = %f\n", i, atom->q[i]);
+    }
+  }
 }
 
+
+/* ---------------------------------------------------------------------- */
+void FixQmhub::zero_qmmm_pair_coeff()
+{
+  // This zeros out all QM-QM pair interactions
+  // (1) QM-QM pairs are zero
+  // force->special_coul and force->special_lj ??? -CL
+  // neigh_list.h NeighList (int) pair_method
+  // neighbor.cpp neigh_bin->istyle
+  // npair (int) istyle
+  // neighbor.cpp list->pair_method
+  // neigh_pair comes from NPair and pair_creator(lmp).
+  // force->pair->list->pair_method | Note: pair_method is it, list is array!!!
+  //
+  // Also see:
+  // ../compute_group_group.cpp:  double *special_coul = force->special_coul;
+  // ../compute_group_group.cpp:  double *special_lj = force->special_lj;
+  // atom property nspecial
+  // EXTRA-FIX has examples of force->pair ...
+  int nlocal = atom->nlocal;
+  // Pair *pair = force->pair;
+  // char *pair_style = force->pair_style;
+
+  // see pair.cpp line 1863 +/-
+  force->init();
+  neighbor->init();
+
+  // There is no check for dummy bond so good luck! -CL
+  for (int i=0; i < nlocal; i++) {
+    for (int j=0; j < nlocal; j++) {
+      if (atom->mask[i] & groupbit_qm) {
+        // printf("Change pair method\n");
+        printf("Change pair method for %2d %2d %2d\n", 
+            atom->tag[i], j, force->pair_style);
+        //     atom->tag[i], j, list[i].pair_method); // force->pair->list[i]->pair_method);
+        //     list is not a pointer, but a class NeighList so use dot (.) 
+      }
+    }
+  }
+}
+
+
+/* ---------------------------------------------------------------------- */
+void FixQmhub::zero_qmmm_bonds()
+{
+  // We can avoid neighbors here because we are directly changing atoms 
+  // This zeros out all bonds related to QM atoms
+  // (1) QM-QM bonds are zero
+  // (2) QM-MM1 bonds are zero
+  int nlocal = atom->nlocal;
+  int **bond_type = atom->bond_type;
+  int nbondtypes = atom->nbondtypes;
+  int nbonds = atom->nbonds;
+  int *num_bond = atom->num_bond;
+
+  // There is no check for dummy bond so good luck! -CL
+  // tag returns index from 1, bond_atom returns index from 1
+  for (int i=0; i < nlocal; i++) {
+    for (int j=0; j < num_bond[i]; j++) {
+      if (atom->mask[i] & groupbit_qm) {
+        printf("Change bond type for %2d %2d %2d -> %2d\n", 
+            atom->tag[i], atom->bond_atom[i][j], bond_type[i][j], nbondtypes);
+        atom->bond_type[i][j] = nbondtypes; // Set to dummy bond type
+      }
+    }
+  }
+}
+
+
+/* ---------------------------------------------------------------------- */
+void FixQmhub::zero_qmmm_angles(int num_qmmm_ratio_angle)
+{
+  // We can avoid neighbors here because we are directly changing atoms 
+  // This zeros out QMMM angles
+  // Amber style: Keep any angle with an MM atom
+  // Gromacs style: Keep any angle with 1 or more MM atoms
+  int nlocal = atom->nlocal;
+  int **angle_type = atom->angle_type;
+  int nangletypes = atom->nangletypes;
+  int nangles = atom->nangles;
+  int *num_angle = atom->num_angle;
+
+  int count_qm_angle_atom;
+  int **angle_atom1 = atom->angle_atom1;
+  int **angle_atom2 = atom->angle_atom2;
+  int **angle_atom3 = atom->angle_atom3;
+  // Amber style QMMM angles (only delete QM-QM-QM)
+  if (num_qmmm_ratio_angle == 3) {
+    for (int i=0; i < nlocal; i++) {
+      count_qm_angle_atom = 0;
+      for (int j=0; j < num_angle[i]; j++) {
+        if ((atom->mask[angle_atom1[i][j]-1] & groupbit_qm) &&
+            (atom->mask[angle_atom2[i][j]-1] & groupbit_qm) && 
+            (atom->mask[angle_atom3[i][j]-1] & groupbit_qm)) {
+          printf("Change angle type for %2d %2d %2d %2d -> %2d\n",
+          angle_atom1[i][j], angle_atom2[i][j], angle_atom3[i][j],
+          angle_type[i][j], nangletypes); 
+          // Set to dummy angle type
+          atom->angle_type[i][j] = nangletypes;
+        } 
+      }
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+void FixQmhub::zero_qmmm_dihedrals(int num_qmmm_ratio_dihedral)
+{
+  // We can avoid neighbors here because we are directly changing atoms 
+  // This zeros out QMMM dihedrals
+  // Amber style: Keep any dihedral with an MM atom
+  // Gromacs style: Keep any dihedral with 1 or more MM atoms
+  int nlocal = atom->nlocal;
+  int **dihedral_type = atom->dihedral_type;
+  int ndihedraltypes = atom->ndihedraltypes;
+  int ndihedrals = atom->ndihedrals;
+  int *num_dihedral = atom->num_dihedral;
+
+  int count_qm_dihedral_atom;
+  int **dihedral_atom1 = atom->dihedral_atom1;
+  int **dihedral_atom2 = atom->dihedral_atom2;
+  int **dihedral_atom3 = atom->dihedral_atom3;
+  int **dihedral_atom4 = atom->dihedral_atom4;
+  // Amber style QMMM dihedrals (only delete QM-QM-QM)
+  if (num_qmmm_ratio_dihedral == 4) {
+    for (int i=0; i < nlocal; i++) {
+      count_qm_dihedral_atom = 0;
+      for (int j=0; j < num_dihedral[i]; j++) {
+        if ((atom->mask[dihedral_atom1[i][j]-1] & groupbit_qm) &&
+            (atom->mask[dihedral_atom2[i][j]-1] & groupbit_qm) && 
+            (atom->mask[dihedral_atom3[i][j]-1] & groupbit_qm) && 
+            (atom->mask[dihedral_atom4[i][j]-1] & groupbit_qm)) {
+          printf("Change dihedral type for %2d %2d %2d %2d %2d -> %2d\n",
+          dihedral_atom1[i][j], dihedral_atom2[i][j],
+          dihedral_atom3[i][j], dihedral_atom4[i][j],
+          dihedral_type[i][j], ndihedraltypes); 
+          // Set to dummy dihedral type
+          atom->dihedral_type[i][j] = ndihedraltypes;
+        } 
+      }
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+void FixQmhub::setup_qm_link(int nlinkatoms)
+{
+  int nlocal = atom->nlocal;
+  int max_nlinkatoms_local = 32; // Hardcode max nlink atoms on local processor (32 is excessive)
+  int count_nlink_local = 0;
+  double mm1_charges_local = 0.0;
+
+  int **bond_index = atom->bond_atom;
+  int *qm_boundary_idx_local = nullptr;
+  int *mm1_boundary_idx_local = nullptr;
+  memory->create(qm_boundary_idx_local,  max_nlinkatoms_local, "fix/qmhub:qm_boundary_idx_local");
+  memory->create(mm1_boundary_idx_local, max_nlinkatoms_local, "fix/qmhub:mm1_boundary_idx_local");
+
+  for (int i = 0; i < nlocal; i++) {
+    if (atom->mask[i] & groupbit_qm) {
+      for (int j=0; j < atom->num_bond[i]; j++) {
+        if (atom->mask[bond_index[i][j]-1] & groupbit_mm) {
+          qm_boundary_idx_local[count_nlink_local] = i;
+          mm1_boundary_idx_local[count_nlink_local] = bond_index[i][j]-1;
+          mm1_charges_local += atom->q[bond_index[i][j]-1];
+          count_nlink_local++;
+        }
+      } 
+    }
+  }
+
+  // Leave nprocs and root here? better way to handle MPI variables? -CL
+  int nprocs, root;
+  MPI_Comm_size(world, &nprocs); // how many procs are in use
+  // Sum nlinkatoms
+  MPI_Allreduce(&count_nlink_local, &nlinkatoms, 1, MPI_INT, MPI_SUM, world);
+
+  if (nlinkatoms > 0) {
+    // Later: add ability to choose Amber or GROMACS style for handling boundary -CL
+    // Charge balancing and redistribution
+    set_qmmm_charges(nlinkatoms, count_nlink_local, mm1_charges_local, qm_boundary_idx_local, mm1_boundary_idx_local);
+  }
+  // Always Zero out QM Pair Interactions (LJ/Coul/etc.)
+  zero_qmmm_pair_coeff();
+  // Always Zero out QMMM bonds
+  // Zero QMMM1 bonds
+  zero_qmmm_bonds();
+
+  // If link atoms exist, zero out angles, dihedrals, impropers, pairs
+  if (nlinkatoms > 0) {
+    // Zero QMMM1 angles
+    if (atom->nangletypes > 0) {
+    int num_qmmm_ratio_angle = 3; // Amber
+    zero_qmmm_angles(num_qmmm_ratio_angle);
+    }
+    // Zero QMMM1 dihedrals
+    printf("ndihedraltypes %d\n", atom->ndihedraltypes);
+    if (atom->ndihedraltypes > 0) {
+      int num_qmmm_ratio_dihedral = 4; // Amber
+      zero_qmmm_dihedrals(num_qmmm_ratio_dihedral);
+    }
+  }
+
+  // Destroy things...
+  
+  // Due to atom sort events, might be better to always work in local index
+  // memory->create(qm_boundary_idx, nlinkatoms);
+  // memory->create(mm1_boundary_idx, nlinkatoms);
+  // MPI_Gather(qm_boundary_idx_local, count_nlink_local, MPI_INT, qm_boundary_idx, rec, disp, MPI_INT, 0, world);
+}
 
 /* ---------------------------------------------------------------------- */
 
@@ -687,3 +837,27 @@ double FixQmhub::compute_scalar()
 } 
 
 /* ---------------------------------------------------------------------- */
+
+//
+// auto req = neighbor->add_request(this, NeighConst::REQ_OCCASIONAL);
+// if (cutflag) req->set_cutoff(mycutneigh);
+
+// neighbor->build_one(list);
+// int **bondlist = list->bondlist;
+// int nbondlist = list->nbondlist;
+
+// int nlocal = atom->nlocal;
+// // int **bondlist = neighbor->bondlist;
+// // int nbondlist = neighbor->nbondlist;
+// printf("nbondlist = %d\n", nbondlist);
+// for (int i=0; i < nbondlist; i++) {
+//   printf("bondlist[%d][0] = %d\n", i, bondlist[i][0]);
+//   printf("bondlist[%d][1] = %d\n", i, bondlist[i][1]);
+//   printf("bondlist[%d][2] = %d\n", i, bondlist[i][2]);
+// }
+//
+// per atom.cpp: int *num_bond, int **bond_type, tagint **bond_atom
+// add_peratom("num_bond",&num_bond,INT,0);
+// add_peratom_vary("bond_type",&bond_type,INT,&bond_per_atom,&num_bond);
+// add_peratom_vary("bond_atom",&bond_atom,tagintsize,&bond_per_atom,&num_bond);
+
