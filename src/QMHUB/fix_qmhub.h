@@ -43,12 +43,18 @@ class FixQmhub : public Fix {
                         int *qm_boundary_idx_local,
                         int *mm1_boundary_idx_local);
 
+  // void search_qmmm_link_atoms();
+
   void zero_qmmm_pair_coeff();
   void zero_qmmm_bonds();
   void zero_qmmm_angles(int num_qmmm_ratio_angle);
   void zero_qmmm_dihedrals(int num_qmmm_ratio_dihedral);
-
   void setup_qm_link(int nlinkatoms);   // Handle setup of QM-MM boundary
+  void link_atom_force_method(int qm_idx,
+                              int mm1_idx,
+                              double *link_grad,
+                              double *link_grad_proj);
+
   // void setup_qm_link(double *qm_coord,   // Handle setup of QM-MM boundary
   //                   double *qm_chrgs, 
   //                   int    *qm_types, 
@@ -57,7 +63,9 @@ class FixQmhub : public Fix {
 
   double compute_scalar() override;	// For printing to thermo via thermo_style
 
- protected:
+  int nlinkatoms;
+
+ // protected:
   int num_qm;				// Number of QM atoms
   int num_mm;				// Number of MM atoms
   double total_qm_charge;   // Summed charge of QM atoms using FF charges
@@ -79,8 +87,6 @@ class FixQmhub : public Fix {
   int igroup_mm;			// Groupbit Int     for region 'MM'
   int groupbit_qm;			// Groupbit bitMask for region 'QM'
   int groupbit_mm;			// Groupbit bitMask for region 'MM'
-
-  int nlinkatoms;
 
   double E_SCF;				// SCF Energy from QM package (Hartree)
 
