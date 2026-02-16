@@ -6,9 +6,11 @@ torchmd-net
 lammps
 pysemi
 pycp2k
+mpicp2k
 sella
-pydftbplus
-Fri Oct 31 14:28:58 CDT 2025
+ash
+wrkase
+Sun Feb 15 19:29:42 CST 2026
 -- Running check for auto-generated files from make-based build system
 -- Could NOT find FFMPEG (missing: FFMPEG_EXECUTABLE) 
 -- Checking for module 'fftw3'
@@ -28,7 +30,7 @@ Fri Oct 31 14:28:58 CDT 2025
  * Python3
 
 -- <<< Build configuration >>>
-   LAMMPS Version:   20240829 582d0f4-modified
+   LAMMPS Version:   20240829 9054e66-modified
    Operating System: Linux CentOS 7
    CMake Version:    3.24.3
    Build type:       RelWithDebInfo
@@ -110,4 +112,4 @@ Consolidate compiler generated dependencies of target lammps
 Consolidate compiler generated dependencies of target lmp
 [100%] Linking CXX executable lmp
 [100%] Built target lmp
-Fri Oct 31 14:29:43 CDT 2025
+Sun Feb 15 19:30:12 CST 2026

@@ -426,6 +426,7 @@ void FixQmhub::post_force(int vflag)
   const double HABOHR_KCALMOLA = (627.5096080305927) / (0.529177210544);
   int count_qm = 0;
   int count_mm = 0;
+  // printf("Force Section: Start\n"); // -CL
   for (int i = 0; i < nlocal; i++) {
     if (atom->mask[i] & groupbit_qm) {
       for (int dim = 0; dim < 3; dim++) {
@@ -433,12 +434,19 @@ void FixQmhub::post_force(int vflag)
       }
       count_qm++;
       if (nlinkatoms > 0) {
+        // printf("Force Section: Link atoms detected\n"); // -CL
         // calculate QM portion of link atom force...
         for (int j=0; j < nlinkatoms; j++) {
-          if (atom->map(i)-1 == qm_boundary_idx[j]) {
+          // i is local index. map gives local index
+          // j is link atom index
+          // printf("Force Section: %2d %2d %2d %2d\n",
+          //       i, j, atom->tag[i], qm_boundary_idx[j]); // -CL
+          if (atom->tag[i]-1 == qm_boundary_idx[j]) {
             // QM atom is link and local! Do thing
             // j can index qm_boundary_idx and link_grad
             // for qm, subtract force
+            // printf("Force Section: QM boundary atom: %2d %2d %2d %2d\n",
+            //     i, j, atom->tag[i], qm_boundary_idx[j]); // -CL
             link_atom_force_method(qm_boundary_idx[j],
                 mm1_boundary_idx[j], link_grad, link_grad_proj);
             for (int dim=0; dim < 3; dim++) {
@@ -455,7 +463,7 @@ void FixQmhub::post_force(int vflag)
       if (nlinkatoms > 0) {
         // calculate MM portion of link atom force...
         for (int j=0; j < nlinkatoms; j++) {
-          if (atom->map(i)-1 == mm1_boundary_idx[j]) {
+          if (atom->tag[i]-1 == mm1_boundary_idx[j]) {
             link_atom_force_method(qm_boundary_idx[j],
                 mm1_boundary_idx[j], link_grad, link_grad_proj);
             for (int dim=0; dim < 3; dim++) {
@@ -717,10 +725,12 @@ void FixQmhub::zero_qmmm_bonds()
   // tag returns index from 1, bond_atom returns index from 1
   for (int i=0; i < nlocal; i++) {
     for (int j=0; j < num_bond[i]; j++) {
-      if (atom->mask[i] & groupbit_qm) {
+      // Only zero out QM-QM bonds
+      if ((atom->mask[i] & groupbit_qm) && 
+          (atom->mask[atom->bond_atom[i][j]-1] & groupbit_qm)) {
         printf("Change bond type for %2d %2d %2d -> %2d\n", 
             atom->tag[i], atom->bond_atom[i][j], bond_type[i][j], nbondtypes);
-        atom->bond_type[i][j] = nbondtypes; // Set to dummy bond type
+            atom->bond_type[i][j] = nbondtypes; // Set to dummy bond type
       }
     }
   }
