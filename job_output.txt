@@ -10,7 +10,7 @@ mpicp2k
 sella
 ash
 wrkase
-Sun Feb 15 19:29:42 CST 2026
+Mon Feb 16 19:02:16 CST 2026
 -- Running check for auto-generated files from make-based build system
 -- Could NOT find FFMPEG (missing: FFMPEG_EXECUTABLE) 
 -- Checking for module 'fftw3'
@@ -30,7 +30,7 @@ Sun Feb 15 19:29:42 CST 2026
  * Python3
 
 -- <<< Build configuration >>>
-   LAMMPS Version:   20240829 9054e66-modified
+   LAMMPS Version:   20240829 9867fbc-modified
    Operating System: Linux CentOS 7
    CMake Version:    3.24.3
    Build type:       RelWithDebInfo
@@ -59,7 +59,6 @@ Sun Feb 15 19:29:42 CST 2026
 -- Configuring done
 -- Generating done
 -- Build files have been written to: /scratch/chance/lammps/build
-[  0%] Built target platform.h
 [  0%] Built target pointers.h
 [  0%] Built target region.h
 [  0%] Built target timer.h
@@ -105,6 +104,7 @@ Consolidate compiler generated dependencies of target colvars
 [ 15%] Built target neigh_list.h
 [ 15%] Built target output.h
 [ 15%] Built target pair.h
+[ 15%] Built target platform.h
 Consolidate compiler generated dependencies of target lammps
 [ 15%] Building CXX object CMakeFiles/lammps.dir/scratch/chance/lammps/src/QMHUB/fix_qmhub.cpp.o
 [ 15%] Linking CXX static library liblammps.a
@@ -112,4 +112,4 @@ Consolidate compiler generated dependencies of target lammps
 Consolidate compiler generated dependencies of target lmp
 [100%] Linking CXX executable lmp
 [100%] Built target lmp
-Sun Feb 15 19:30:12 CST 2026
+Mon Feb 16 19:03:29 CST 2026

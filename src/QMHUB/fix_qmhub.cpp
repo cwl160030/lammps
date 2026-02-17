@@ -14,6 +14,8 @@
 #include "update.h"
 #include "tokenizer.h"
 
+#include "modify.h" // needed for adding compute energy? -CL
+
 #include <cmath> // for power in distance
 
 #include <cstdio>
@@ -137,6 +139,9 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) : Fix(lmp, narg, arg)
   scalar_flag = 1;
   global_freq = 1;
   extscalar   = 1;
+  // may be needed for minimization/md
+  energy_global_flag = 1;
+  // thermo_energy = 1;
 
   int ntypes = atom->ntypes;
   atomic_numbers = nullptr;
@@ -236,6 +241,8 @@ void FixQmhub::setup(int vflag)
   if ((mkret != 0) && (errno != EEXIST)) error->all(FLERR, "fix qmhub error: could not create or access directory ./qmhub/");
 
   post_integrate();
+  // post_force(); // CHECK HERE IF MD RUN OR RUN 0
+  // GIVES INCORRECT ENERGY/GRADIENT!!!!  -CL
 }
 
 /* ---------------------------------------------------------------------- */
@@ -467,7 +474,7 @@ void FixQmhub::post_force(int vflag)
             link_atom_force_method(qm_boundary_idx[j],
                 mm1_boundary_idx[j], link_grad, link_grad_proj);
             for (int dim=0; dim < 3; dim++) {
-              atom->f[i][dim] += HABOHR_KCALMOLA * link_grad_proj[dim];
+              atom->f[i][dim] -= HABOHR_KCALMOLA * link_grad_proj[dim];
             }
           }
         }
@@ -499,16 +506,22 @@ void FixQmhub::post_force(int vflag)
 
 void FixQmhub::min_setup(int vflag)
 {
-  setup(vflag);
+  // setup(vflag);
+  printf("min_setup\n");
+  post_force(vflag);
 }
 
 void FixQmhub::min_pre_force(int vflag)
 {
-  post_integrate(); // Should this be here?? I think this uses MD func in MIN run -CL
+  // This writes the qmmm.inp file before force calculation
+  printf("min_pre_force\n");
+  post_integrate(); // maybe rename? -CL 
 }
 
 void FixQmhub::min_post_force(int vflag)
 {
+  // This reads the qmmm.out file after force calculation
+  printf("min_post_force\n");
   post_force(vflag);
 }
 
@@ -1042,14 +1055,14 @@ void FixQmhub::link_atom_force_method(int qm_idx, int mm1_idx, double *link_grad
   link_grad_proj[0] = f_qlqm * (link_grad[0] + dotprod * unit_qmx);
   link_grad_proj[1] = f_qlqm * (link_grad[1] + dotprod * unit_qmx);
   link_grad_proj[2] = f_qlqm * (link_grad[2] + dotprod * unit_qmx);
-  printf("Link atom grad: QM %2d MM1 %2d\n", qm_idx, mm1_idx);
-  printf("x %8.4f   y %8.4f   z %8.4f\n", link_grad_proj[0], link_grad_proj[1], link_grad_proj[2]);
+  // printf("Link atom grad: QM %2d MM1 %2d\n", qm_idx, mm1_idx);
+  // printf("x %8.4f   y %8.4f   z %8.4f\n", link_grad_proj[0], link_grad_proj[1], link_grad_proj[2]);
 }
 /* ---------------------------------------------------------------------- */
 // Add SCF Energy (Ha) to thermo via thermo_style custom ... f_ID ...
 double FixQmhub::compute_scalar()
 {
-  return E_SCF;
+  return E_SCF * 627.5096080305927;
 } 
 
 /* ---------------------------------------------------------------------- */

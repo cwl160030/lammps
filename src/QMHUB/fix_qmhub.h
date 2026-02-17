@@ -88,7 +88,7 @@ class FixQmhub : public Fix {
   int groupbit_qm;			// Groupbit bitMask for region 'QM'
   int groupbit_mm;			// Groupbit bitMask for region 'MM'
 
-  double E_SCF;				// SCF Energy from QM package (Hartree)
+  double E_SCF;				// SCF Energy from QM package (kcal/mol)
 
   private:
   class NeighList *list;
