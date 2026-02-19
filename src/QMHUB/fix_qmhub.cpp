@@ -224,7 +224,7 @@ void FixQmhub::setup(int vflag)
   if ((mkret != 0) && (errno != EEXIST)) error->all(FLERR, "fix qmhub error: could not create or access directory ./qmhub/");
 
   post_integrate();
-  // post_force(); // May change so that run 0 will run QC calculation
+  post_force(vflag); // May change so that run 0 will run QC calculation
 }
 
 /* ---------------------------------------------------------------------- */
@@ -268,7 +268,7 @@ void FixQmhub::post_integrate()
     fprintf(fp_qmmm_inp, "%d %d %d %d %d\n", num_qm+nlinkatoms, num_mm-nlinkatoms, qm_r_chrg, qm_r_spin, is_pbc);
     for (int i = 0; i < num_qm; i++) {
       fprintf(fp_qmmm_inp, "% .15E % .15E % .15E % .15E %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], atomic_numbers[qm_types[i]-1]);
-      printf("Writing  QM  %2d inp  = %8.4f %8.4f %8.4f %8.4f %2d\n", i, qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], atomic_numbers[qm_types[i]-1]);
+      // printf("Writing  QM  %2d inp  = %8.4f %8.4f %8.4f %8.4f %2d\n", i, qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], atomic_numbers[qm_types[i]-1]);
     }
     if (nlinkatoms > 0) {
       // Print X-link atom type and coord into QC input file
@@ -285,7 +285,7 @@ void FixQmhub::post_integrate()
         zqm = zqm - linkdist * delz / sqrt(delx * delx + dely * dely + delz * delz);
         // later change 0.0 to FF charge from data file -CL
         fprintf(fp_qmmm_inp, "% .15E % .15E % .15E % .15E %d\n", xqm, yqm, zqm, 0.0, linkatom_sym);
-        printf("Writing  LA  %2d inp  = %8.4f %8.4f %8.4f %8.4f %2d\n", i, xqm, yqm, zqm, 0.0, linkatom_sym);
+        // printf("Writing  LA  %2d inp  = %8.4f %8.4f %8.4f %8.4f %2d\n", i, xqm, yqm, zqm, 0.0, linkatom_sym);
       }
     }
     // Slow to loop through link atoms for each MM atom... -CL
@@ -307,8 +307,8 @@ void FixQmhub::post_integrate()
               fprintf(fp_qmmm_inp, "% .15E % .15E % .15E % .15E\n", 
                       mm_coord[3*counter], mm_coord[3*counter+1], 
                       mm_coord[3*counter+2], mm_chrgs[counter]);
-              printf("Writing  MM  %2d inp  = %8.4f %8.4f %8.4f %8.4f\n", counter, mm_coord[3*counter], 
-                     mm_coord[3*counter+1], mm_coord[3*counter+2], mm_chrgs[counter]);
+              // printf("Writing  MM  %2d inp  = %8.4f %8.4f %8.4f %8.4f\n", counter, mm_coord[3*counter], 
+              //        mm_coord[3*counter+1], mm_coord[3*counter+2], mm_chrgs[counter]);
               counter++;
             }
           }
@@ -362,15 +362,15 @@ void FixQmhub::post_force(int vflag)
     // Read QM forces (always assume there are QM atoms)
     for (int i = 0; i < num_qm; i++) {
       fscanf(fp_qmmm_out, "%lf %lf %lf", &qm_grad[3*i], &qm_grad[3*i+1], &qm_grad[3*i+2]);
-      printf("Reading QM  %2d grad = %15.8f %15.8f %15.8f\n", i, qm_grad[3*i],
-             qm_grad[3*i+1], qm_grad[3*i+2]);
+      // printf("Reading QM  %2d grad = %15.8f %15.8f %15.8f\n", i, qm_grad[3*i],
+      //        qm_grad[3*i+1], qm_grad[3*i+2]);
     }
     // Read link atom forces if present
     if (nlinkatoms > 0) {
       for (int i = 0; i < nlinkatoms; i++) {
         fscanf(fp_qmmm_out, "%lf %lf %lf", &link_grad[3*i], &link_grad[3*i+1], &link_grad[3*i+2]);
-        printf("Reading LA  %2d grad = %15.8f %15.8f %15.8f\n", i, link_grad[3*i],
-               link_grad[3*i+1], link_grad[3*i+2]);
+        // printf("Reading LA  %2d grad = %15.8f %15.8f %15.8f\n", i, link_grad[3*i],
+        //        link_grad[3*i+1], link_grad[3*i+2]);
       }
     }
     // If link atoms present, there will be MM atoms missing in qmmm.out (MM1 atoms)
@@ -385,7 +385,7 @@ void FixQmhub::post_force(int vflag)
             // if MM1 atom, zero grad, will receive f_FF and f_link later
             if (i == mm1_boundary_idx[j]) {
               // The total f_MM1 = f_FF_MM1 + 0*f_QMMM_MM1 + f_link_MM1
-              printf("Reading MM1 %2d grad = %15.8f %15.8f %15.8f\n", counter, 0.0, 0.0, 0.0);
+              // printf("Reading MM1 %2d grad = %15.8f %15.8f %15.8f\n", counter, 0.0, 0.0, 0.0);
               mm_grad[3*counter]   = 0.0;
               mm_grad[3*counter+1] = 0.0;
               mm_grad[3*counter+2] = 0.0;
@@ -395,8 +395,8 @@ void FixQmhub::post_force(int vflag)
               // Read MM gradient
               fscanf(fp_qmmm_out, "%lf %lf %lf", &mm_grad[3*counter], 
                      &mm_grad[3*counter+1], &mm_grad[3*counter+2]);
-              printf("Reading MM  %2d grad = %15.8f %15.8f %15.8f\n", counter, mm_grad[3*counter],
-                     mm_grad[3*counter+1], mm_grad[3*counter+2]);
+              // printf("Reading MM  %2d grad = %15.8f %15.8f %15.8f\n", counter, mm_grad[3*counter],
+              //        mm_grad[3*counter+1], mm_grad[3*counter+2]);
               counter++;
             }
           }
@@ -491,18 +491,18 @@ void FixQmhub::post_force(int vflag)
             // j can index qm_boundary_idx and link_grad
             link_atom_force_method(qm_boundary_idx[j], mm1_boundary_idx[j], 
                     link_grad[3*j], link_grad[3*j+1], link_grad[3*j+2], link_grad_proj);
-            printf("\n f_qm   = %15.8f %15.8f %15.8f\n", atom->f[i][0]/HABOHR_KCALMOLA, 
-                    atom->f[i][1]/HABOHR_KCALMOLA, atom->f[i][2]/HABOHR_KCALMOLA);
-            printf(" f_link = %15.8f %15.8f %15.8f\n", (-1)*link_grad[3*j+0], (-1)*link_grad[3*j+1], (-1)*link_grad[3*j+2]);
-            printf(" f_proj = %15.8f %15.8f %15.8f\n", (-1)*link_grad_proj[3*j+0], (-1)*link_grad_proj[3*j+1], (-1)*link_grad_proj[3*j+2]);
+            // printf("\n f_qm   = %15.8f %15.8f %15.8f\n", atom->f[i][0]/HABOHR_KCALMOLA, 
+            //         atom->f[i][1]/HABOHR_KCALMOLA, atom->f[i][2]/HABOHR_KCALMOLA);
+            // printf(" f_link = %15.8f %15.8f %15.8f\n", (-1)*link_grad[3*j+0], (-1)*link_grad[3*j+1], (-1)*link_grad[3*j+2]);
+            // printf(" f_proj = %15.8f %15.8f %15.8f\n", (-1)*link_grad_proj[3*j+0], (-1)*link_grad_proj[3*j+1], (-1)*link_grad_proj[3*j+2]);
             for (int dim=0; dim < 3; dim++) {
               // QM-MM link grad
               // Chain rule similar to Amber
               atom->f[i][dim] -= HABOHR_KCALMOLA *(link_grad[3*j+dim] - link_grad_proj[dim]);
             }
-            printf("\n*f_qm   = f_qm + f_link - f_proj\n");
-            printf("*f_qm   = %15.8f %15.8f %15.8f\n", atom->f[i][0]/HABOHR_KCALMOLA, 
-                    atom->f[i][1]/HABOHR_KCALMOLA, atom->f[i][2]/HABOHR_KCALMOLA);
+            // printf("\n*f_qm   = f_qm + f_link - f_proj\n");
+            // printf("*f_qm   = %15.8f %15.8f %15.8f\n", atom->f[i][0]/HABOHR_KCALMOLA, 
+            //         atom->f[i][1]/HABOHR_KCALMOLA, atom->f[i][2]/HABOHR_KCALMOLA);
           }
         }
       }
@@ -518,19 +518,19 @@ void FixQmhub::post_force(int vflag)
           if (atom->tag[i]-1 == mm1_boundary_idx[j]) {
             link_atom_force_method(qm_boundary_idx[j], mm1_boundary_idx[j], 
                     link_grad[3*j], link_grad[3*j+1], link_grad[3*j+2], link_grad_proj);
-            printf("\n f_mm   = %15.8f %15.8f %15.8f\n", atom->f[i][0]/HABOHR_KCALMOLA, 
-                    atom->f[i][1]/HABOHR_KCALMOLA, atom->f[i][2]/HABOHR_KCALMOLA);
-            printf(" f_link = %15.8f %15.8f %15.8f\n", (-1)*link_grad[3*j+0], (-1)*link_grad[3*j+1], (-1)*link_grad[3*j+2]);
-            printf(" f_proj = %15.8f %15.8f %15.8f\n", (-1)*link_grad_proj[3*j+0], (-1)*link_grad_proj[3*j+1], (-1)*link_grad_proj[3*j+2]);
+            // printf("\n f_mm   = %15.8f %15.8f %15.8f\n", atom->f[i][0]/HABOHR_KCALMOLA, 
+            //         atom->f[i][1]/HABOHR_KCALMOLA, atom->f[i][2]/HABOHR_KCALMOLA);
+            // printf(" f_link = %15.8f %15.8f %15.8f\n", (-1)*link_grad[3*j+0], (-1)*link_grad[3*j+1], (-1)*link_grad[3*j+2]);
+            // printf(" f_proj = %15.8f %15.8f %15.8f\n", (-1)*link_grad_proj[3*j+0], (-1)*link_grad_proj[3*j+1], (-1)*link_grad_proj[3*j+2]);
             for (int dim=0; dim < 3; dim++) {
               // MM-QM link grad
               // Chain rule similar to Amber
               atom->f[i][dim] -= HABOHR_KCALMOLA * link_grad_proj[dim];
             }
-            printf("\n*f_mm   = f_mm + f_proj\n");
-            printf("*f_mm   = %15.8f %15.8f %15.8f\n", atom->f[i][0]/HABOHR_KCALMOLA, 
-                    atom->f[i][1]/HABOHR_KCALMOLA, atom->f[i][2]/HABOHR_KCALMOLA);
-            printf("\n");
+            // printf("\n*f_mm   = f_mm + f_proj\n");
+            // printf("*f_mm   = %15.8f %15.8f %15.8f\n", atom->f[i][0]/HABOHR_KCALMOLA, 
+            //         atom->f[i][1]/HABOHR_KCALMOLA, atom->f[i][2]/HABOHR_KCALMOLA);
+            // printf("\n");
           }
         }
       }
@@ -562,21 +562,21 @@ void FixQmhub::post_force(int vflag)
 void FixQmhub::min_setup(int vflag)
 {
   // setup(vflag);
-  printf("min_setup\n");
+  // printf("min_setup\n");
   post_force(vflag);
 }
 
 void FixQmhub::min_pre_force(int vflag)
 {
   // This writes the qmmm.inp file before force calculation
-  printf("min_pre_force\n");
+  // printf("min_pre_force\n");
   post_integrate(); // maybe rename? -CL 
 }
 
 void FixQmhub::min_post_force(int vflag)
 {
   // This reads the qmmm.out file after force calculation
-  printf("min_post_force\n");
+  // printf("min_post_force\n");
   post_force(vflag);
 }
 
@@ -736,11 +736,13 @@ void FixQmhub::set_qmmm_charges(int nlinkatoms, int count_nlink_local, double mm
 
   qmmm_delta_q = total_qm_charge + mm1_charges - (double) qm_r_chrg;
 
-  printf("Cluster  Charge:   %f\n", total_qm_charge); // g
-  printf("MM1      Charge:   %f\n", mm1_charges); // g
-  printf("QM Int   Charge:   %d\n", qm_r_chrg); // g
-  printf("Charge Difference: %f\n", qmmm_delta_q); // pass
-  printf("This system has %d QM link-atoms\n", nlinkatoms); // g
+  if ((comm->me==0) && screen) {
+    fprintf(screen, "Cluster  Charge:   %f\n", total_qm_charge);
+    fprintf(screen, "MM1      Charge:   %f\n", mm1_charges);
+    fprintf(screen, "QM Int   Charge:   %d\n", qm_r_chrg);
+    fprintf(screen, "Charge Difference: %f\n", qmmm_delta_q);
+    fprintf(screen, "This system has %d QM link-atoms\n", nlinkatoms);
+  }
 
   num_non_qmmm1_atoms = num_mm - nlinkatoms;
   if (num_non_qmmm1_atoms > 0) redis_charge = qmmm_delta_q / num_non_qmmm1_atoms;
@@ -759,20 +761,20 @@ void FixQmhub::set_qmmm_charges(int nlinkatoms, int count_nlink_local, double mm
   // Zero out MM1 charges
   for (int j=0; j < count_nlink_local; j++) {
     atom->q[mm1_boundary_idx_local[j]] = 0;
-    printf("qMM1[%d] = %f\n", mm1_boundary_idx_local[j], atom->q[mm1_boundary_idx_local[j]]);
+    // printf("qMM1[%d] = %f\n", mm1_boundary_idx_local[j], atom->q[mm1_boundary_idx_local[j]]);
   }
 
   // Just for debugging
-  for (int i = 0; i < nlocal; i++) {
-    // Adjusted QM charges
-    if (atom->mask[i] & groupbit_qm) {
-      printf("Q[%d] = %f\n", i, atom->q[i]);
-    }
-    // Adjusted MM charges
-    if (atom->mask[i] & groupbit_mm) {
-      printf("Q[%d] = %f\n", i, atom->q[i]);
-    }
-  }
+  // for (int i = 0; i < nlocal; i++) {
+  //   // Adjusted QM charges
+  //   if (atom->mask[i] & groupbit_qm) {
+  //     printf("Q[%d] = %f\n", i, atom->q[i]);
+  //   }
+  //   // Adjusted MM charges
+  //   if (atom->mask[i] & groupbit_mm) {
+  //     printf("Q[%d] = %f\n", i, atom->q[i]);
+  //   }
+  // }
 }
 
 
@@ -1138,8 +1140,8 @@ void FixQmhub::link_atom_force_method(int qm_idx, int mm1_idx, double link_gradx
   // get projected gradient correction
   // Note link_grad is only term with units
   link_grad_proj[0] = f_qlqm * (link_gradx - dotprod * unit_qmx);
-  link_grad_proj[1] = f_qlqm * (link_grady - dotprod * unit_qmx);
-  link_grad_proj[2] = f_qlqm * (link_gradz - dotprod * unit_qmx);
+  link_grad_proj[1] = f_qlqm * (link_grady - dotprod * unit_qmy);
+  link_grad_proj[2] = f_qlqm * (link_gradz - dotprod * unit_qmz);
 }
 /* ---------------------------------------------------------------------- */
 // Add SCF Energy (Ha) to thermo via thermo_style custom ... f_ID ...
