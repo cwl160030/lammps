@@ -49,10 +49,13 @@ class FixQmhub : public Fix {
   void zero_qmmm_bonds();
   void zero_qmmm_angles(int num_qmmm_ratio_angle);
   void zero_qmmm_dihedrals(int num_qmmm_ratio_dihedral);
+  void zero_qmmm_impropers();
   void setup_qm_link(int nlinkatoms);   // Handle setup of QM-MM boundary
   void link_atom_force_method(int qm_idx,
                               int mm1_idx,
-                              double *link_grad,
+                              double link_gradx,
+                              double link_grady,
+                              double link_gradz,
                               double *link_grad_proj);
 
   // void setup_qm_link(double *qm_coord,   // Handle setup of QM-MM boundary
@@ -80,6 +83,7 @@ class FixQmhub : public Fix {
   char *qm_atom_index_filename; // Pointer to name of file containing QM atomic numbers
   int *qm_boundary_idx;         // Array of indices for QM atoms bound to MM1 atoms
   int *mm1_boundary_idx;        // Array of indices for MM1 atoms bound to QM atoms
+  // double *mm1_boundary_charge;  // Array of charges for MM1 atom needed for qmmm.inp/out
  
   // std::vector<int> qm_atom_labels; // Vector of QM atomic numbers
 
