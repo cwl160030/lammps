@@ -10,7 +10,7 @@ mpicp2k
 sella
 ash
 wrkase
-Wed Feb 18 22:45:13 CST 2026
+Tue Mar  3 21:45:14 CST 2026
 -- Running check for auto-generated files from make-based build system
 -- Could NOT find FFMPEG (missing: FFMPEG_EXECUTABLE) 
 -- Checking for module 'fftw3'
@@ -30,13 +30,13 @@ Wed Feb 18 22:45:13 CST 2026
  * Python3
 
 -- <<< Build configuration >>>
-   LAMMPS Version:   20240829 b8e0579-modified
+   LAMMPS Version:   20240829 05f2f26-modified
    Operating System: Linux CentOS 7
    CMake Version:    3.24.3
    Build type:       RelWithDebInfo
    Install path:     /home/chance/.local
    Generator:        Unix Makefiles using /usr/bin/gmake
--- Enabled packages: AMOEBA;COLVARS;DRUDE;EXTRA-COMMAND;EXTRA-DUMP;EXTRA-FIX;EXTRA-MOLECULE;EXTRA-PAIR;FEP;INTEL;KSPACE;MANIFOLD;MISC;MOLECULE;OPENMP;OPT;ORIENT;PHONON;QMHUB;REPLICA;RIGID
+-- Enabled packages: AMOEBA;COLVARS;DRUDE;EXTRA-COMMAND;EXTRA-DUMP;EXTRA-FIX;EXTRA-MOLECULE;EXTRA-PAIR;FEP;INTEL;KSPACE;MANIFOLD;MISC;MOLECULE;OPENMP;OPT;ORIENT;PHONON;QEQ;QMHUB;REPLICA;RIGID
 -- <<< Compilers and Flags: >>>
 -- C++ Compiler:     /opt/intel/oneapi/compiler/2021.2.0/linux/bin/icpx
       Type:          IntelLLVM
@@ -59,6 +59,7 @@ Wed Feb 18 22:45:13 CST 2026
 -- Configuring done
 -- Generating done
 -- Build files have been written to: /scratch/chance/lammps/build
+[  0%] Built target platform.h
 [  0%] Built target pointers.h
 [  0%] Built target region.h
 [  0%] Built target timer.h
@@ -66,7 +67,7 @@ Wed Feb 18 22:45:13 CST 2026
 [  0%] Built target update.h
 [  0%] Built target utils.h
 [  1%] Built target variable.h
-[  2%] Built target fmt_core.h
+[  1%] Built target fmt_core.h
 [  2%] Built target fmt_format.h
 [  2%] Built target atom.h
 [  2%] Built target bond.h
@@ -104,12 +105,11 @@ Consolidate compiler generated dependencies of target colvars
 [ 15%] Built target neigh_list.h
 [ 15%] Built target output.h
 [ 15%] Built target pair.h
-[ 15%] Built target platform.h
 Consolidate compiler generated dependencies of target lammps
-[ 15%] Building CXX object CMakeFiles/lammps.dir/scratch/chance/lammps/src/QMHUB/fix_qmhub.cpp.o
-[ 15%] Linking CXX static library liblammps.a
+[ 16%] Building CXX object CMakeFiles/lammps.dir/scratch/chance/lammps/src/QMHUB/fix_qmhub.cpp.o
+[ 16%] Linking CXX static library liblammps.a
 [100%] Built target lammps
 Consolidate compiler generated dependencies of target lmp
 [100%] Linking CXX executable lmp
 [100%] Built target lmp
-Wed Feb 18 22:45:46 CST 2026
+Tue Mar  3 21:46:09 CST 2026

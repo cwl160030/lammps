@@ -20,16 +20,16 @@ class FixQmhub : public Fix {
   void init_list(int, class NeighList *) override;
   int setmask() override;
   void post_constructor() override;
-  // Need to pass pointer instead of vector
-  // std::vector<int> set_qm_atom_labels(int, char*, std::vector<int>);
   void set_atomic_numbers(int, char*, int*);
 
-  void setup(int) override;		// send positions and charges to QMHub
+  void setup(int) override;		    // send positions and charges to QMHub
+  void setup_pre_force(int) override;	
   void post_integrate() override;	// send positions and charges to QMHub
-  void post_force(int) override;	// receive forces from QMHub
+  void pre_force(int) override;	    // R/W qmmm.inp qmmm.out and update E&F before run 0
+  void qmmm_force();                // receive forces from QMHub
   void min_setup(int) override;	
-  void min_pre_force(int) override;	// is it necessary since setup calls post_integrate()?
-  void min_post_force(int) override;	// receive forces from QMHub
+  void min_setup_pre_force(int);	
+  void min_pre_force(int) override;
 
   void get_lmp_data(double *qm_coord,   // get positions, charges, and QM types
                     double *qm_chrgs, 
@@ -43,26 +43,20 @@ class FixQmhub : public Fix {
                         int *qm_boundary_idx_local,
                         int *mm1_boundary_idx_local);
 
-  // void search_qmmm_link_atoms();
-
   void zero_qmmm_pair_coeff();
   void zero_qmmm_bonds();
   void zero_qmmm_angles(int num_qmmm_ratio_angle);
   void zero_qmmm_dihedrals(int num_qmmm_ratio_dihedral);
   void zero_qmmm_impropers();
-  void setup_qm_link(int nlinkatoms);   // Handle setup of QM-MM boundary
+
+  void setup_qm_link(); // int nlinkatoms);   // Handle setup of QM-MM boundary
+
   void link_atom_force_method(int qm_idx,
                               int mm1_idx,
                               double link_gradx,
                               double link_grady,
                               double link_gradz,
                               double *link_grad_proj);
-
-  // void setup_qm_link(double *qm_coord,   // Handle setup of QM-MM boundary
-  //                   double *qm_chrgs, 
-  //                   int    *qm_types, 
-  //                   double *mm_coord, 
-  //                   double *mm_chrgs);
 
   double compute_scalar() override;	// For printing to thermo via thermo_style
 
@@ -76,16 +70,15 @@ class FixQmhub : public Fix {
   int qm_r_chrg;			// Charge of QM region
   int qm_r_spin;			// Spin mulciplicity of QM region
   int is_pbc;				// 0 -> no pbc, 1 -> pbc
-  int *atomic_numbers;			/* list of atomic numbers of atoms
-					   in the simulation; ordered so
-					   atomic_numbers[i] corresponds to
-					   atom type i */
+  int *atomic_numbers;      // List atomtype atom numbers for QMHub
+
   char *qm_atom_index_filename; // Pointer to name of file containing QM atomic numbers
   int *qm_boundary_idx;         // Array of indices for QM atoms bound to MM1 atoms
-  int *mm1_boundary_idx;        // Array of indices for MM1 atoms bound to QM atoms
+  int *mm1_boundary_idx;        // Array of indices mapping global MM1 index to 0:num_mm index
+  int *mm1_boundary_mapped;     // Array of indices for MM1 atoms bound to QM atoms
+  double *qm_qmmm_charge;       // Array of initial QM FF charges
+  double *mm1_qmmm_charge;      // Array of initial MM1 FF charges
   // double *mm1_boundary_charge;  // Array of charges for MM1 atom needed for qmmm.inp/out
- 
-  // std::vector<int> qm_atom_labels; // Vector of QM atomic numbers
 
   int igroup_qm;			// Groupbit Int     for region 'QM'
   int igroup_mm;			// Groupbit Int     for region 'MM'

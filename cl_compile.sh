@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --partition=express
-#SBATCH --time=0-01:00:00
+#SBATCH --partition=batch
+#SBATCH --time=0-10:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --output=job_output.txt
@@ -43,6 +43,7 @@ cmake -DCMAKE_CXX_COMPILER=icpx \
       -DPKG_REPLICA=on \
       -DPKG_RIGID=on \
       -DPKG_QMHUB=on \
+      -DPKG_QEQ=on \
       ../cmake
 cmake --build .
 
