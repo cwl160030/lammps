@@ -18,7 +18,14 @@ module load impi/2021.2.0
 #mkdir build; cd build    # create and use a build directory
 cd build # use if build exists
 date
-cmake -DCMAKE_CXX_COMPILER=icpx \
+# For parallel, change lammps_machine, build_mpi, and pkg_openmp
+# cmake -DLAMMPS_MACHINE=serial \
+#       -DBUILD_MPI=no \
+#       -DPKG_OPENMP=off \
+cmake -DLAMMPS_MACHINE=mpi \
+      -DBUILD_MPI=yes \
+      -DPKG_OPENMP=on \
+      -DCMAKE_CXX_COMPILER=icpx \
       -DCMAKE_C_COMPILER=icx \
       -DCMAKE_Fortran_COMPILER=ifx \
       -DPKG_AMOEBA=on \
@@ -36,7 +43,6 @@ cmake -DCMAKE_CXX_COMPILER=icpx \
       -DPKG_MISC=on \
       -DPKG_MOFF=on \
       -DPKG_MOLECULE=on \
-      -DPKG_OPENMP=on \
       -DPKG_OPT=on \
       -DPKG_ORIENT=on \
       -DPKG_PHONON=on \

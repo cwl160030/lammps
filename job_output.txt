@@ -10,7 +10,7 @@ mpicp2k
 sella
 ash
 wrkase
-Tue Mar  3 21:45:14 CST 2026
+Thu Mar 12 20:09:10 CDT 2026
 -- Running check for auto-generated files from make-based build system
 -- Could NOT find FFMPEG (missing: FFMPEG_EXECUTABLE) 
 -- Checking for module 'fftw3'
@@ -30,7 +30,7 @@ Tue Mar  3 21:45:14 CST 2026
  * Python3
 
 -- <<< Build configuration >>>
-   LAMMPS Version:   20240829 05f2f26-modified
+   LAMMPS Version:   20240829 0408bdc-modified
    Operating System: Linux CentOS 7
    CMake Version:    3.24.3
    Build type:       RelWithDebInfo
@@ -45,7 +45,7 @@ Tue Mar  3 21:45:14 CST 2026
       C++ Flags:     -O2 -g -DNDEBUG
       Defines:       LAMMPS_SMALLBIG;LAMMPS_MEMALIGN=64;LAMMPS_OMP_COMPAT=4;LAMMPS_JPEG;LAMMPS_PNG;LAMMPS_GZIP;FFT_KISS;LMP_OPENMP;LMP_INTEL;LMP_INTEL_USELRT;LMP_USE_MKL_RNG
 -- <<< Linker flags: >>>
--- Executable name:  lmp
+-- Executable name:  lmp_mpi
 -- Static library flags:    
 -- <<< MPI flags >>>
 -- MPI_defines:      MPICH_SKIP_MPICXX;OMPI_SKIP_MPICXX;_MPICC_H
@@ -90,8 +90,10 @@ Tue Mar  3 21:45:14 CST 2026
 [  3%] Built target lattice.h
 [  3%] Built target library.h
 Consolidate compiler generated dependencies of target lepton
+[  3%] Linking CXX static library liblammps_lepton_mpi.a
 [ 10%] Built target lepton
 Consolidate compiler generated dependencies of target colvars
+[ 10%] Linking CXX static library liblammps_colvars_mpi.a
 [ 14%] Built target colvars
 -- Git Directory: /scratch/chance/lammps/.git
 -- Generating lmpgitversion.h...
@@ -106,10 +108,9 @@ Consolidate compiler generated dependencies of target colvars
 [ 15%] Built target output.h
 [ 15%] Built target pair.h
 Consolidate compiler generated dependencies of target lammps
-[ 16%] Building CXX object CMakeFiles/lammps.dir/scratch/chance/lammps/src/QMHUB/fix_qmhub.cpp.o
-[ 16%] Linking CXX static library liblammps.a
+[ 15%] Linking CXX static library liblammps_mpi.a
 [100%] Built target lammps
 Consolidate compiler generated dependencies of target lmp
-[100%] Linking CXX executable lmp
+[100%] Linking CXX executable lmp_mpi
 [100%] Built target lmp
-Tue Mar  3 21:46:09 CST 2026
+Thu Mar 12 20:10:28 CDT 2026

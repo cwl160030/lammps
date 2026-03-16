@@ -182,7 +182,7 @@ FixQmhub::FixQmhub(LAMMPS *lmp, int narg, char **arg) : Fix(lmp, narg, arg)
   
   // Initialize SCF energy for thermo/min
   E_SCF = 0.0; 
-  printf("test - constructor nlinkatoms %2d\n", nlinkatoms);
+  // printf("test - constructor nlinkatoms %2d\n", nlinkatoms);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -270,7 +270,7 @@ void FixQmhub::post_integrate()
   int linkatom_sym = 1;
   // idx arrays will be global index.
 
-  printf("test - nlinkatoms = %2d\n", nlinkatoms);
+  // printf("test - nlinkatoms = %2d\n", nlinkatoms);
   if (comm->me == 0) {
     FILE *fp_qmmm_inp = fopen("./qmhub/qmmm.inp", "w");
     if (fp_qmmm_inp == nullptr) error->all(FLERR, "fix qmhub error: cannot open 'qmmm.inp'");
@@ -279,7 +279,7 @@ void FixQmhub::post_integrate()
     fprintf(fp_qmmm_inp, "%d %d %d %d %d\n", num_qm+nlinkatoms, num_mm-nlinkatoms, qm_r_chrg, qm_r_spin, is_pbc);
     for (int i = 0; i < num_qm; i++) {
       // fprintf(fp_qmmm_inp, "% .15E % .15E % .15E % .15E %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_chrgs[i], atomic_numbers[qm_types[i]-1]);
-      printf("test - QM  %2d\n", i);
+      // printf("test - QM  %2d\n", i);
       fprintf(fp_qmmm_inp, "% .15E % .15E % .15E % .15E %d\n", qm_coord[3*i], qm_coord[3*i+1], qm_coord[3*i+2], qm_qmmm_charge[i], atomic_numbers[qm_types[i]-1]);
     }
     if (nlinkatoms > 0) {
@@ -297,7 +297,7 @@ void FixQmhub::post_integrate()
         zqm = zqm - linkdist * delz / sqrt(delx * delx + dely * dely + delz * delz);
         // pass qm_boundary_idx[i], mm1_boundary_idx[i]
         // later change 0.0 to FF charge from data file -CL
-        printf("test - MM1 %2d\n", i);
+        // printf("test - MM1 %2d\n", i);
         fprintf(fp_qmmm_inp, "% .15E % .15E % .15E % .15E %d\n", xqm, yqm, zqm, mm1_qmmm_charge[i], linkatom_sym);
       }
     }
@@ -308,11 +308,11 @@ void FixQmhub::post_integrate()
       // i : index all atoms (global)
       for (int i = 0; i < num_mm; i++) {
         if (i == mm1_boundary_mapped[la_counter]) {
-          printf("%2d = mm1_boundary_mapped[%d]\n", i, la_counter);
+          // printf("%2d = mm1_boundary_mapped[%d]\n", i, la_counter);
           la_counter++;
         }
         else {
-          printf("test - MM  %2d\n", i);
+          // printf("test - MM  %2d\n", i);
           fprintf(fp_qmmm_inp, "% .15E % .15E % .15E % .15E\n", 
                   mm_coord[3*i], mm_coord[3*i+1], 
                   mm_coord[3*i+2], mm_chrgs[i]);
@@ -359,9 +359,9 @@ void FixQmhub::post_integrate()
     fflush(fp_qmmm_inp); 
     fclose(fp_qmmm_inp);
 
-    for (int i=0; i < num_mm; i++) {
-      printf("%2d -> %.15E\n", i, mm_chrgs[i]);
-    }
+    // for (int i=0; i < num_mm; i++) {
+    //   printf("%2d -> %.15E\n", i, mm_chrgs[i]);
+    // }
 
     memory->destroy(qm_coord);
     memory->destroy(qm_chrgs);
@@ -576,17 +576,17 @@ void FixQmhub::qmmm_force()// post_force(int vflag)
 
 void FixQmhub::setup_pre_force(int vflag)
 {
-  printf("test - setup_pre_force nlinkatoms %2d\n", nlinkatoms);
+  // printf("test - setup_pre_force nlinkatoms %2d\n", nlinkatoms);
   pre_force(vflag);
 }
 void FixQmhub::pre_force(int vflag)
 {
   // This writes the qmmm.inp file before force calculation
-  printf("test - pre_force nlinkatoms %2d\n", nlinkatoms);
+  // printf("test - pre_force nlinkatoms %2d\n", nlinkatoms);
   post_integrate(); // maybe rename? -CL 
-  printf("test - after post_integrate nlinkatoms %2d\n", nlinkatoms);
+  // printf("test - after post_integrate nlinkatoms %2d\n", nlinkatoms);
   qmmm_force();
-  printf("test - after qmmm_force nlinkatoms %2d\n", nlinkatoms);
+  // printf("test - after qmmm_force nlinkatoms %2d\n", nlinkatoms);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -646,14 +646,14 @@ void FixQmhub::get_lmp_data(double *qm_coord, double *qm_chrgs, int *qm_types, d
       }
       qm_chrgs_local[count_qm] = q[i];
       qm_types_local[count_qm] = type[i];
-      printf("qm_chrgs_local[%2d] = q[%2d] = %.15E, type = %d\n", count_qm, i, q[i], type[i]);
+      // printf("qm_chrgs_local[%2d] = q[%2d] = %.15E, type = %d\n", count_qm, i, q[i], type[i]);
       count_qm++;
     }
     else if (atom->mask[i] & groupbit_mm) {
       for (int dim = 0; dim < 3; dim++){
         mm_coord_local[3*count_mm+dim] = x[i][dim];
       }
-      printf("mm_chrgs_local[%2d] = q[%2d] = %.15E\n", count_mm, i, q[i]);
+      // printf("mm_chrgs_local[%2d] = q[%2d] = %.15E\n", count_mm, i, q[i]);
       mm_chrgs_local[count_mm] = q[i];
       count_mm++;
     }
@@ -793,9 +793,9 @@ void FixQmhub::set_qmmm_charges(int nlinkatoms, int count_nlink_local, double mm
     // printf("qMM1[%d] = %f\n", mm1_boundary_idx_local[j], atom->q[mm1_boundary_idx_local[j]]);
   }
 
-  for (int k=0; k < atom->nlocal; k++) {
-    printf("atom->q[%2d] = %.15E\n", k, atom->q[k]);
-  }
+  // for (int k=0; k < atom->nlocal; k++) {
+  //   printf("atom->q[%2d] = %.15E\n", k, atom->q[k]);
+  // }
 
   // Just for debugging
   // for (int i = 0; i < nlocal; i++) {
@@ -1109,7 +1109,7 @@ void FixQmhub::setup_qm_link()
         // If global atom index is MM1 global index
         // Then save mm_counter to mm1 mapped
         if (i == mm1_boundary_idx[j]) {
-          printf("MM1 MAPPED [%2d] = %2d\n", j, mm_counter);
+          // printf("MM1 MAPPED [%2d] = %2d\n", j, mm_counter);
           mm1_boundary_mapped[j] = mm_counter;
           // mm_counter++;
         }
@@ -1164,12 +1164,12 @@ void FixQmhub::setup_qm_link()
             0, // broadcast root from proc 0
             world); // world communicator
 
-  for (int i=0; i < num_qm; i++) {
-    printf("qm_qmmm_charge  %2d = %.15E\n", i, qm_qmmm_charge[i]);
-  }
-  for (int i=0; i < nlinkatoms; i++) {
-    printf("mm1_qmmm_charge %2d = %.15E\n", i, mm1_qmmm_charge[i]);
-  }
+  // for (int i=0; i < num_qm; i++) {
+  //   printf("qm_qmmm_charge  %2d = %.15E\n", i, qm_qmmm_charge[i]);
+  // }
+  // for (int i=0; i < nlinkatoms; i++) {
+  //   printf("mm1_qmmm_charge %2d = %.15E\n", i, mm1_qmmm_charge[i]);
+  // }
   // if (comm->me == 0) {
   //   memory->destroy(count_qm_all);
   // }
